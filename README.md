@@ -1,0 +1,1 @@
+This project contains code related to creating an AI consultant for farmers in the AGPV domain.
