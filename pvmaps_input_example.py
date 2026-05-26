@@ -1,0 +1,19 @@
+from pvmaps_validators import validate_pvmaps_input
+from pvmaps_default_input import create_default_pvmaps_input
+from pvmaps_mock_run import run_mock_pvmaps
+from pvmaps_explain_output import explain_pvmaps_result
+
+pvmaps_input = create_default_pvmaps_input(40.4237, -86.9212) #example
+
+errors=validate_pvmaps_input(pvmaps_input)
+if errors:
+    print("Input validation failed with the following errors:")
+    for error in errors:
+        print(f"- {error}")
+else:
+    pvmaps_output=run_mock_pvmaps(pvmaps_input)
+    print("PVMAPS Output:")
+    print(pvmaps_output)
+    explanation = explain_pvmaps_result(pvmaps_input, pvmaps_output)
+    print("\nExplanation:")
+    print(explanation)
