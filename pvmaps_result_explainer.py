@@ -1,4 +1,4 @@
-def explain_pvmaps_result(pvmaps_input, output):
+def explain_pvmaps_result(output):
     assumptions = output["assumptions"]
 
     return f"""
@@ -13,6 +13,4 @@ This estimate uses:
 
 Highest monthly yield: {max(output["monthly_yield"]):.1f} {output["yield_unit"]}
 Lowest monthly yield: {min(output["monthly_yield"]):.1f} {output["yield_unit"]}
-
-Note: this is currently from the mock PVMAPS runner, not the real MATLAB model.
 """

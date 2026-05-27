@@ -1,2 +1,4 @@
 __pycache__/
 *.py[cod]
+#ignore the PV-MAPS-main folder
+PV-MAPS-main/

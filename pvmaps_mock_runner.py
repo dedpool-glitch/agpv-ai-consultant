@@ -11,7 +11,7 @@ def run_mock_pvmaps(pvmaps_input):
             7.3277, 7.4299, 6.5819, 5.7291,
             5.2465, 4.3986, 3.6607, 3.0646
         ],
-        "yield_unit": "kWh/m²",
+        "yield_unit": "kWh/m",
         "warnings": [],
         "assumptions": {
             "model": "mock_pvmaps",

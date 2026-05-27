@@ -1,22 +1,23 @@
 def validate_pvmaps_input(data):
     errors = []
 
-    if data["module"]["cell_tech"] not in ["monofacial", "bifacial", "perovskite"]:
+    allowed_cell_tech = ["AL_BSF", "BI_PERC", "SHJ", "PVK_SI_2T", "PVK_SI_4T", "SHJ_NN"]
+    if data["module"]["cell_tech"] not in allowed_cell_tech:
         errors.append("Invalid cell technology.")
 
     if data["module"]["height"] <= 0:
         errors.append("Module height must be positive.")
 
-    if not (0 <= data["module"]["stc_eff"]["direct"] <= 1):
-        errors.append("Direct efficiency must be between 0 and 1.")
+    if not (0 <= data["module"]["stc_eff"]["direct"] <= 100):
+        errors.append("Direct efficiency must be between 0 and 100 percent.")
 
-    if not (0 <= data["module"]["stc_eff"]["diffuse"] <= 1):
-        errors.append("Diffuse efficiency must be between 0 and 1.")
+    if not (0 <= data["module"]["stc_eff"]["diffuse"] <= 100):
+        errors.append("Diffuse efficiency must be between 0 and 100 percent.")
 
-    if not (-0.01 <= data["module"]["tcoeff"] <= 0):
-        errors.append("Temperature coefficient should usually be between -0.01 and 0.")
+    if not (0 <= data["module"]["tcoeff"] <= 0.01):
+        errors.append("Temperature coefficient should usually be between 0 and 0.01.")
 
-    if data["array"]["config"] not in ["fixed", "single_axis", "dual_axis"]:
+    if data["array"]["config"] not in ["fixed", "tracking", "GSVBF"]:
         errors.append("Invalid tracking configuration.")
 
     if not (0 <= data["array"]["tilt"] <= 90):

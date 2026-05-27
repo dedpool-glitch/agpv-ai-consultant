@@ -17,7 +17,7 @@ create_default_pvmaps_input()
 
 ## Files
 
-### `pvmaps_default_input.py`
+### `pvmaps_input_builder.py`
 
 Defines:
 
@@ -46,7 +46,7 @@ array.gsHeight
 array.elevation
 ```
 
-### `pvmaps_validators.py`
+### `pvmaps_input_validator.py`
 
 Defines:
 
@@ -56,7 +56,7 @@ validate_pvmaps_input(data)
 
 Checks bounds and allowed values for PVMAPS inputs, including latitude, longitude, tilt, azimuth, albedo, pitch, module efficiency, temperature coefficient, and tracking configuration.
 
-### `pvmaps_mock_run.py`
+### `pvmaps_mock_runner.py`
 
 Defines:
 
@@ -77,7 +77,7 @@ warnings
 assumptions
 ```
 
-### `pvmaps_explain_output.py`
+### `pvmaps_result_explainer.py`
 
 Defines:
 
@@ -87,7 +87,7 @@ explain_pvmaps_result(pvmaps_input, output)
 
 Converts PVMAPS output into readable text for the user.
 
-### `pvmaps_input_example.py`
+### `demo_mock_pipeline.py`
 
 Runs the full example pipeline.
 
