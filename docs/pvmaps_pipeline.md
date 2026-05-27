@@ -82,7 +82,7 @@ assumptions
 Defines:
 
 ```python
-explain_pvmaps_result(pvmaps_input, output)
+explain_pvmaps_result(output)
 ```
 
 Converts PVMAPS output into readable text for the user.
@@ -102,6 +102,82 @@ It creates default input, validates it, runs the mock PVMAPS function, and print
 - We validate inputs before simulation.
 - We are not scientifically validating PVMAPS outputs yet.
 - Later, the final LLM/RAG response should be checked before it is shown to the user.
+
+## MATLAB Integration Demo
+
+The project now includes a real MATLAB PVMAPS runner and a Streamlit technical demo.
+
+### Files
+
+- `pvmaps_matlab_runner.py`
+- `demo_matlab_pipeline.py`
+- `app.py`
+
+### Flow
+
+```text
+Streamlit/demo script
+-> create PVMAPS input dictionary
+-> validate input
+-> start MATLAB Engine
+-> set MATLAB path
+-> input = initiate()
+-> overwrite input fields
+-> output = simulate(input)
+-> extract yearly/monthly/daily yield
+-> explain result
+```
+
+### Path Detail
+
+`script_path` should point to the project root:
+
+```text
+D:/agpv-ai-consultant/PV-MAPS-main
+```
+
+not directly to:
+
+```text
+D:/agpv-ai-consultant/PV-MAPS-main/pvmaps
+```
+
+The MATLAB runner constructs the PVMAPS subpaths internally:
+
+```text
+script_path/pvmaps
+script_path/pvmaps/data
+script_path/pvmaps/lib/...
+```
+
+### Current Demo Defaults
+
+The known-working demo configuration currently uses:
+
+```text
+array.config = tracking
+module.cell_tech = AL_BSF
+module.height = 4.8
+module.stc_eff.direct = 21.8
+module.stc_eff.diffuse = 21.8
+module.tcoeff = 0.0041
+array.tilt = 25
+array.azimuth = 90
+array.albedo = 0.3
+array.pitch = 11
+array.gsHeight = 0.5
+array.elevation = 3
+```
+
+### Known Issue
+
+The `fixed` configuration produced an internal PVMAPS error with the current default input set:
+
+```text
+Unrecognized function or variable 'I_gnd_x'
+```
+
+This does not necessarily mean fixed systems are unsupported. It means fixed systems need separate testing and possibly different compatible defaults.
 
 ## Design Principle
 

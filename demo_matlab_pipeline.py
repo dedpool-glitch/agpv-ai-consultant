@@ -14,5 +14,5 @@ if errors:
 else:
     pvmaps_folder_path = r"D:/agpv-ai-consultant/PV-MAPS-main"
     output = run_pvmaps(pvmaps_input, pvmaps_folder_path)
-    explanation = explain_pvmaps_result(pvmaps_input, output)
+    explanation = explain_pvmaps_result(output)
     print(explanation)

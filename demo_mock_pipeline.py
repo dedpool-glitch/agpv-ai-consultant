@@ -14,6 +14,6 @@ else:
     pvmaps_output=run_mock_pvmaps(pvmaps_input)
     print("PVMAPS Output:")
     print(pvmaps_output)
-    explanation = explain_pvmaps_result(pvmaps_input, pvmaps_output)
+    explanation = explain_pvmaps_result(pvmaps_output)
     print("\nExplanation:")
     print(explanation)
