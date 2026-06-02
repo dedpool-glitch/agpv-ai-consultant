@@ -6,6 +6,7 @@ from pvmaps_input_validator import validate_pvmaps_input
 from pvmaps_matlab_runner import run_pvmaps
 from pvmaps_result_explainer import explain_pvmaps_result
 from location_geocoder import geocode_location
+from panel_specs import get_panel_models, get_panel_specs
 
 st.title("PVMAPS Solar Yield Demo")
 
@@ -31,11 +32,28 @@ if "coordinates" in st.session_state:
     st.write("Fill in the parameters below to run the PVMAPS simulation. Default values are provided for convenience, but you can adjust them as needed.")
 
     #define input fields for solar panel parameters
+    panel_model_options = ["Manual / default values"] + get_panel_models()
+    panel_model = st.selectbox("Panel model from datasheet", options=panel_model_options)
+
+    if panel_model == "Manual / default values":
+        panel_specs = {
+            "cell_type_raw": "not specified",
+            "module_height": 4.8,
+            "stc_eff_direct": 21.8,
+            "stc_eff_diffuse": 21.8,
+            "tcoeff": 0.0041,
+            "source": "default PVMAPS example",
+        }
+    else:
+        panel_specs = get_panel_specs(panel_model)
+        st.write(f"Datasheet cell type: {panel_specs['cell_type_raw']}")
+        st.write(f"Source: {panel_specs['source']}")
+
     cell_tech=st.selectbox("Cell Technology", options=["AL_BSF", "BI_PERC","SHJ","PVK_SI_2T","PVK_SI_4T","SHJ_NN"])
-    height=st.number_input("Panel Height(metres)", value=4.8, format="%.2f")
-    direct_eff=st.number_input("Direct Efficiency", value=21.8, format="%.2f")
-    diffuse_eff=st.number_input("Diffuse Efficiency", value=21.8, format="%.2f")
-    tcoeff=st.number_input("Temperature Coefficient", value=0.0041, format="%.4f")
+    height=st.number_input("Panel Height(metres)", value=float(panel_specs["module_height"]), format="%.3f")
+    direct_eff=st.number_input("Direct Efficiency", value=float(panel_specs["stc_eff_direct"]), format="%.2f")
+    diffuse_eff=st.number_input("Diffuse Efficiency", value=float(panel_specs["stc_eff_diffuse"]), format="%.2f")
+    tcoeff=st.number_input("Temperature Coefficient", value=float(panel_specs["tcoeff"]), format="%.4f")
 
 
     #define input fields for array parameters
