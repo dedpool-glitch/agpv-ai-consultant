@@ -32,12 +32,13 @@ if "coordinates" in st.session_state:
     st.write("Fill in the parameters below to run the PVMAPS simulation. Default values are provided for convenience, but you can adjust them as needed.")
 
     #define input fields for solar panel parameters
-    panel_model_options = ["Manual / default values"] + get_panel_models()
+    panel_model_options = ["default values"] + get_panel_models()
     panel_model = st.selectbox("Panel model from datasheet", options=panel_model_options)
 
-    if panel_model == "Manual / default values":
+    if panel_model == "default values":
         panel_specs = {
             "cell_type_raw": "not specified",
+            "cell_tech": "AL_BSF",
             "module_height": 4.8,
             "stc_eff_direct": 21.8,
             "stc_eff_diffuse": 21.8,
@@ -48,8 +49,9 @@ if "coordinates" in st.session_state:
         panel_specs = get_panel_specs(panel_model)
         st.write(f"Datasheet cell type: {panel_specs['cell_type_raw']}")
         st.write(f"Source: {panel_specs['source']}")
-
-    cell_tech=st.selectbox("Cell Technology", options=["AL_BSF", "BI_PERC","SHJ","PVK_SI_2T","PVK_SI_4T","SHJ_NN"])
+        st.write(f"PVMAPS cell technology: {panel_specs['cell_tech']}")
+        
+    cell_tech = panel_specs["cell_tech"]
     height=st.number_input("Panel Height(metres)", value=float(panel_specs["module_height"]), format="%.3f")
     direct_eff=st.number_input("Direct Efficiency", value=float(panel_specs["stc_eff_direct"]), format="%.2f")
     diffuse_eff=st.number_input("Diffuse Efficiency", value=float(panel_specs["stc_eff_diffuse"]), format="%.2f")
