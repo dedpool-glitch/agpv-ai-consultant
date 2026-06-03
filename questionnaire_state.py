@@ -1,35 +1,4 @@
-REQUIRED_QUESTIONNAIRE_FIELDS = [
-    "panel_model",
-    "array_config",
-    "tilt",
-    "azimuth",
-    "albedo",
-    "pitch",
-    "gs_height",
-    "array_elevation"
-]
-
-QUESTION_MAP = {
-    "panel_model": "Do you know the solar panel model number, or do you have a datasheet?",
-    "array_config": "Do you know whether the panels are fixed, tracking, or vertical bifacial with ground sculpting?",
-    "tilt": "Do you know the panel tilt angle in degrees?",
-    "azimuth": "Do you know whether the panel rows are oriented east-west or north-south?",
-    "albedo": "Do you know the ground surface type under the panels, such as soil, grass, gravel, or reflective material?",
-    "pitch": "Do you know the row spacing between panel rows?",
-    "gs_height": "Does this design include ground sculpting? If yes, do you know the ground sculpting height?",
-    "array_elevation": "Do you know how high the panels are mounted above the ground?",
-}
-
-QUESTIONNAIRE_DEFAULTS = {
-    "panel_model": "default values",
-    "array_config": "tracking",
-    "tilt": 25.0,
-    "azimuth": 90.0,
-    "albedo": 0.3,
-    "pitch": 11.0,
-    "gs_height": 0.5,
-    "array_elevation": 3.0,
-}
+from constants import QUESTION_MAP, QUESTIONNAIRE_DEFAULTS, REQUIRED_QUESTIONNAIRE_FIELDS
 
 def initialize_questionnaire_state():
     return {
