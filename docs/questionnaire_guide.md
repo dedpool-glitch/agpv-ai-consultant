@@ -303,6 +303,68 @@ structured output
 
 The LLM should not directly run PVMAPS or bypass validation.
 
+## Current Backend Implementation
+
+The questionnaire backend has been started in code.
+
+### `questionnaire_state.py`
+
+Tracks what the questionnaire has collected.
+
+Responsibilities:
+
+```text
+create empty questionnaire state
+track required fields
+return the next missing question
+update state from user answers
+apply defaults for missing values
+record assumptions when values are defaulted
+```
+
+This acts as the checklist that the future LLM/questionnaire will follow.
+
+### `questionnaire_to_pvmaps.py`
+
+Converts completed questionnaire state into a PVMAPS input dictionary.
+
+Responsibilities:
+
+```text
+read selected panel model
+load panel specs from panel_specs.json
+combine panel specs + array answers + lat/lon
+call create_default_pvmaps_input(...)
+return model-ready PVMAPS input
+```
+
+### `demo_questionnaire_pipeline.py`
+
+Tests the questionnaire backend without Streamlit or an LLM.
+
+Current flow:
+
+```text
+create questionnaire state
+simulate a few user answers
+apply defaults for missing fields
+convert state to PVMAPS input
+validate input
+run mock PVMAPS
+print explanation and assumptions
+```
+
+This proves:
+
+```text
+questionnaire answers
+-> structured state
+-> PVMAPS input dictionary
+-> simulation output
+```
+
+before adding the LLM conversation layer.
+
 ## Open Researcher Questions
 
 - Which module defaults should be used when no datasheet is available?
