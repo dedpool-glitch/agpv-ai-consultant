@@ -1,47 +1,54 @@
+from constants import (
+    ALLOWED_CELL_TECH,
+    ARRAY_CONFIG_OPTIONS,
+    PVMAPS_VALIDATION_LIMITS,
+    PVMAPS_VALIDATION_MESSAGES,
+)
+
+
 def validate_pvmaps_input(data):
     errors = []
 
-    allowed_cell_tech = ["AL_BSF", "BI_PERC", "SHJ", "PVK_SI_2T", "PVK_SI_4T", "SHJ_NN"]
-    if data["module"]["cell_tech"] not in allowed_cell_tech:
-        errors.append("Invalid cell technology.")
+    if data["module"]["cell_tech"] not in ALLOWED_CELL_TECH:
+        errors.append(PVMAPS_VALIDATION_MESSAGES["invalid_cell_tech"])
 
     if data["module"]["height"] <= 0:
-        errors.append("Module height must be positive.")
+        errors.append(PVMAPS_VALIDATION_MESSAGES["module_height_positive"])
 
-    if not (0 <= data["module"]["stc_eff"]["direct"] <= 100):
-        errors.append("Direct efficiency must be between 0 and 100 percent.")
+    if not (PVMAPS_VALIDATION_LIMITS["efficiency_min"] <= data["module"]["stc_eff"]["direct"] <= PVMAPS_VALIDATION_LIMITS["efficiency_max"]):
+        errors.append(PVMAPS_VALIDATION_MESSAGES["direct_efficiency_range"])
 
-    if not (0 <= data["module"]["stc_eff"]["diffuse"] <= 100):
-        errors.append("Diffuse efficiency must be between 0 and 100 percent.")
+    if not (PVMAPS_VALIDATION_LIMITS["efficiency_min"] <= data["module"]["stc_eff"]["diffuse"] <= PVMAPS_VALIDATION_LIMITS["efficiency_max"]):
+        errors.append(PVMAPS_VALIDATION_MESSAGES["diffuse_efficiency_range"])
 
-    if not (0 <= data["module"]["tcoeff"] <= 0.01):
-        errors.append("Temperature coefficient should usually be between 0 and 0.01.")
+    if not (PVMAPS_VALIDATION_LIMITS["tcoeff_min"] <= data["module"]["tcoeff"] <= PVMAPS_VALIDATION_LIMITS["tcoeff_max"]):
+        errors.append(PVMAPS_VALIDATION_MESSAGES["tcoeff_range"])
 
-    if data["array"]["config"] not in ["fixed", "tracking", "GSVBF"]:
-        errors.append("Invalid tracking configuration.")
+    if data["array"]["config"] not in ARRAY_CONFIG_OPTIONS:
+        errors.append(PVMAPS_VALIDATION_MESSAGES["invalid_array_config"])
 
-    if not (0 <= data["array"]["tilt"] <= 90):
-        errors.append("Tilt must be between 0 and 90 degrees.")
+    if not (PVMAPS_VALIDATION_LIMITS["tilt_min"] <= data["array"]["tilt"] <= PVMAPS_VALIDATION_LIMITS["tilt_max"]):
+        errors.append(PVMAPS_VALIDATION_MESSAGES["tilt_range"])
 
-    if not (0 <= data["array"]["azimuth"] <= 360):
-        errors.append("Azimuth must be between 0 and 360 degrees.")
+    if not (PVMAPS_VALIDATION_LIMITS["azimuth_min"] <= data["array"]["azimuth"] <= PVMAPS_VALIDATION_LIMITS["azimuth_max"]):
+        errors.append(PVMAPS_VALIDATION_MESSAGES["azimuth_range"])
 
-    if not (0 <= data["array"]["albedo"] <= 1):
-        errors.append("Albedo must be between 0 and 1.")
+    if not (PVMAPS_VALIDATION_LIMITS["albedo_min"] <= data["array"]["albedo"] <= PVMAPS_VALIDATION_LIMITS["albedo_max"]):
+        errors.append(PVMAPS_VALIDATION_MESSAGES["albedo_range"])
 
     if data["array"]["pitch"] <= 0:
-        errors.append("Pitch must be positive.")
+        errors.append(PVMAPS_VALIDATION_MESSAGES["pitch_positive"])
 
     if data["array"]["gsHeight"] < 0:
-        errors.append("Ground sculpting height cannot be negative.")
+        errors.append(PVMAPS_VALIDATION_MESSAGES["gs_height_nonnegative"])
 
     if data["array"]["elevation"] < 0:
-        errors.append("Array elevation cannot be negative.")
+        errors.append(PVMAPS_VALIDATION_MESSAGES["array_elevation_nonnegative"])
     
-    if not (-90 <= data["lat"] <= 90):
-        errors.append("Latitude must be between -90 and 90.")
+    if not (PVMAPS_VALIDATION_LIMITS["lat_min"] <= data["lat"] <= PVMAPS_VALIDATION_LIMITS["lat_max"]):
+        errors.append(PVMAPS_VALIDATION_MESSAGES["lat_range"])
 
-    if not (-180 <= data["lon"] <= 180):
-        errors.append("Longitude must be between -180 and 180.")
+    if not (PVMAPS_VALIDATION_LIMITS["lon_min"] <= data["lon"] <= PVMAPS_VALIDATION_LIMITS["lon_max"]):
+        errors.append(PVMAPS_VALIDATION_MESSAGES["lon_range"])
 
     return errors

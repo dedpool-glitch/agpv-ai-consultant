@@ -1,7 +1,19 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 
-from constants import NUMERIC_QUESTIONNAIRE_FIELDS
+from constants import (
+    APP_TITLE,
+    ARRAY_CONFIG_OPTIONS,
+    INPUT_MODE,
+    LOCATION_TEXT,
+    MANUAL_INPUT_TEXT,
+    MONTH_LABELS,
+    NUMERIC_QUESTIONNAIRE_FIELDS,
+    PANEL_DEFAULT_SPECS,
+    PVMAPS_RUN_TEXT,
+    QUESTIONNAIRE_UI_TEXT,
+    RESULT_TEXT,
+)
 from pvmaps_input_builder import create_default_pvmaps_input
 from pvmaps_input_validator import validate_pvmaps_input
 from pvmaps_matlab_runner import run_pvmaps
@@ -11,15 +23,15 @@ from panel_specs import get_panel_models, get_panel_specs
 from questionnaire_state import apply_questionnaire_defaults, get_next_question, initialize_questionnaire_state, update_questionnaire_state
 from questionnaire_to_pvmaps import build_pvmaps_input_from_questionnaire
 
-st.title("PVMAPS Solar Yield Demo")
+st.title(APP_TITLE)
 
-location_text = st.text_input("Farm Location (City, State)", value="Lafayette, Indiana, USA")
+location_text = st.text_input(LOCATION_TEXT["input_label"])
 
-if st.button("Retrieve coordinates"):
+if st.button(LOCATION_TEXT["geocode_button"]):
     try:
         st.session_state["coordinates"] = geocode_location(location_text)
     except Exception as error:
-        st.error("Could not retrieve coordinates.")
+        st.error(LOCATION_TEXT["geocode_error"])
         st.code(str(error))
 
 if "coordinates" in st.session_state:
@@ -29,57 +41,49 @@ if "coordinates" in st.session_state:
     lon=coordinates["longitude"]
     address=coordinates["address"]
 
-    st.subheader("Matched Location")
+    st.subheader(LOCATION_TEXT["matched_location_header"])
     st.write(f"Latitude: {lat}, Longitude: {lon}")
 
-    mode=st.radio("Choose input method", options=["Questionnaire", "Manual Input"], index=None)
+    mode=st.radio(INPUT_MODE["label"], options=[INPUT_MODE["questionnaire"], INPUT_MODE["manual"]], index=None)
 
-    if mode=="Manual Input":
-        st.write("Fill in the parameters below to run the PVMAPS simulation. Default values are provided for convenience, but you can adjust them as needed.")
+    if mode==INPUT_MODE["manual"]:
+        st.write(MANUAL_INPUT_TEXT["description"])
 
         #define input fields for solar panel parameters
-        panel_model_options = ["default values"] + get_panel_models()
-        panel_model = st.selectbox("Panel model from datasheet", options=panel_model_options)
+        panel_model_options = [MANUAL_INPUT_TEXT["default_panel_model"]] + get_panel_models()
+        panel_model = st.selectbox(MANUAL_INPUT_TEXT["panel_model_label"], options=panel_model_options)
 
-        if panel_model == "default values":
-            panel_specs = {
-                "cell_type_raw": "not specified",
-                "cell_tech": "AL_BSF",
-                "module_height": 4.8,
-                "stc_eff_direct": 21.8,
-                "stc_eff_diffuse": 21.8,
-                "tcoeff": 0.0041,
-                "source": "default PVMAPS example",
-            }
+        if panel_model == MANUAL_INPUT_TEXT["default_panel_model"]:
+            panel_specs = PANEL_DEFAULT_SPECS
         else:
             panel_specs = get_panel_specs(panel_model)
-            st.write(f"Datasheet cell type: {panel_specs['cell_type_raw']}")
-            st.write(f"Source: {panel_specs['source']}")
-            st.write(f"PVMAPS cell technology: {panel_specs['cell_tech']}")
+            st.write(f"{MANUAL_INPUT_TEXT['datasheet_cell_type_label']}: {panel_specs['cell_type_raw']}")
+            st.write(f"{MANUAL_INPUT_TEXT['source_label']}: {panel_specs['source']}")
+            st.write(f"{MANUAL_INPUT_TEXT['pvmaps_cell_tech_label']}: {panel_specs['cell_tech']}")
 
         cell_tech = panel_specs["cell_tech"]
-        height=st.number_input("Panel Height(metres)", value=float(panel_specs["module_height"]), format="%.3f")
-        direct_eff=st.number_input("Direct Efficiency", value=float(panel_specs["stc_eff_direct"]), format="%.2f")
-        diffuse_eff=st.number_input("Diffuse Efficiency", value=float(panel_specs["stc_eff_diffuse"]), format="%.2f")
-        tcoeff=st.number_input("Temperature Coefficient", value=float(panel_specs["tcoeff"]), format="%.4f")
+        height=st.number_input(MANUAL_INPUT_TEXT["panel_height_label"], value=float(panel_specs["module_height"]), format="%.3f")
+        direct_eff=st.number_input(MANUAL_INPUT_TEXT["direct_efficiency_label"], value=float(panel_specs["stc_eff_direct"]), format="%.2f")
+        diffuse_eff=st.number_input(MANUAL_INPUT_TEXT["diffuse_efficiency_label"], value=float(panel_specs["stc_eff_diffuse"]), format="%.2f")
+        tcoeff=st.number_input(MANUAL_INPUT_TEXT["temperature_coefficient_label"], value=float(panel_specs["tcoeff"]), format="%.4f")
 
         #define input fields for array parameters
-        config=st.selectbox("Array Configuration",options=["fixed","tracking","GSVBF"],index=1)
-        tilt=st.number_input("Tilt angle(degrees)", value=25.0) #have set default values for now incase users don't know something. this is something we can change.
-        azimuth=st.number_input("Azimuth angle(degrees)", value=90.0)
-        albedo=st.number_input("Albedo", value=0.3)
-        pitch=st.number_input("Row Spacing(metres)", value=11.0)
-        gsHeight=st.number_input("Ground Sculpting Height(metres)", value=0.5)
-        elevation=st.number_input("Elevation(metres)", value=3.0)
+        config=st.selectbox(MANUAL_INPUT_TEXT["array_config_label"],options=ARRAY_CONFIG_OPTIONS)
+        tilt=st.number_input(MANUAL_INPUT_TEXT["tilt_label"], value=25.0) #have set default values for now incase users don't know something. this is something we can change.
+        azimuth=st.number_input(MANUAL_INPUT_TEXT["azimuth_label"], value=90.0)
+        albedo=st.number_input(MANUAL_INPUT_TEXT["albedo_label"], value=0.3)
+        pitch=st.number_input(MANUAL_INPUT_TEXT["pitch_label"], value=11.0)
+        gsHeight=st.number_input(MANUAL_INPUT_TEXT["ground_sculpting_height_label"], value=0.5)
+        elevation=st.number_input(MANUAL_INPUT_TEXT["elevation_label"], value=3.0)
 
-    elif mode=="Questionnaire":
+    elif mode==INPUT_MODE["questionnaire"]:
         if "questionnaire_started" not in st.session_state:
             st.session_state["questionnaire_started"] = False
 
         if not st.session_state["questionnaire_started"]:
-            st.write("Start the guided questionnaire when you are ready to provide the remaining PVMAPS inputs.")
+            st.write(QUESTIONNAIRE_UI_TEXT["start_description"])
 
-            if st.button("Start questionnaire"):
+            if st.button(QUESTIONNAIRE_UI_TEXT["start_button"]):
                 st.session_state["questionnaire_state"] = initialize_questionnaire_state()
                 st.session_state["questionnaire_started"] = True
                 st.session_state["questionnaire_ready_to_run"] = False
@@ -93,9 +97,9 @@ if "coordinates" in st.session_state:
                 question=next_question["question"]
 
                 st.write(question)
-                answer=st.text_input("Your answer", key=f"answer_{field}")
+                answer=st.text_input(QUESTIONNAIRE_UI_TEXT["answer_label"], key=f"answer_{field}")
 
-                if st.button("Submit answer", key=f"submit_{field}"):
+                if st.button(QUESTIONNAIRE_UI_TEXT["submit_button"], key=f"submit_{field}"):
                   try:
                     if field in NUMERIC_QUESTIONNAIRE_FIELDS:
                         answer=float(answer)
@@ -103,29 +107,29 @@ if "coordinates" in st.session_state:
                     st.session_state["questionnaire_state"]=state
                     st.rerun()
                   except ValueError:
-                    st.error(f"Invalid input for {field}. Please enter a valid number.")
-                if st.button("Use defaults for remaining answers"):
+                    st.error(QUESTIONNAIRE_UI_TEXT["numeric_error"].format(field=field))
+                if st.button(QUESTIONNAIRE_UI_TEXT["defaults_button"]):
                     apply_questionnaire_defaults(state)
                     st.session_state["questionnaire_state"] = state
                     st.session_state["questionnaire_ready_to_run"] = True
                     st.rerun()
             else:
-                st.write("Questionnaire complete!")
+                st.write(QUESTIONNAIRE_UI_TEXT["complete_message"])
                 st.session_state["questionnaire_ready_to_run"] = True
 
     can_run_pvmaps = (
-        mode == "Manual Input"
+        mode == INPUT_MODE["manual"]
         or (
-            mode == "Questionnaire"
+            mode == INPUT_MODE["questionnaire"]
             and st.session_state.get("questionnaire_ready_to_run", False)
         )
     )
 
-    if mode == "Questionnaire" and not st.session_state.get("questionnaire_ready_to_run", False):
-        st.write("Complete the questionnaire or use defaults before running PVMAPS.")
+    if mode == INPUT_MODE["questionnaire"] and not st.session_state.get("questionnaire_ready_to_run", False):
+        st.write(QUESTIONNAIRE_UI_TEXT["not_ready_message"])
 
-    if can_run_pvmaps and st.button("Run PVMAPS"):
-        if mode=="Manual Input":
+    if can_run_pvmaps and st.button(PVMAPS_RUN_TEXT["run_button"]):
+        if mode==INPUT_MODE["manual"]:
             pvmaps_input = create_default_pvmaps_input(
             lat,
             lon,
@@ -144,7 +148,7 @@ if "coordinates" in st.session_state:
         )
         else:
             if "questionnaire_state" not in st.session_state:
-                st.error("Please start the questionnaire before running PVMAPS.")
+                st.error(QUESTIONNAIRE_UI_TEXT["start_first_error"])
                 st.stop()
 
             state=st.session_state["questionnaire_state"]
@@ -152,38 +156,34 @@ if "coordinates" in st.session_state:
 
         errors = validate_pvmaps_input(pvmaps_input)
         if errors:
-            st.error("Input validation failed:")
+            st.error(PVMAPS_RUN_TEXT["validation_error"])
             for error in errors:
                 st.write("-", error)
         else:
             try:
-                with st.spinner("Running MATLAB PVMAPS..."):
+                with st.spinner(PVMAPS_RUN_TEXT["spinner"]):
                     output = run_pvmaps(
                         pvmaps_input,
                         r"D:/agpv-ai-consultant/PV-MAPS-main"
                     )
             except Exception as error:
-                st.error("PVMAPS simulation failed.")
-                st.write(
-                    "The selected configuration may not be supported by the current PVMAPS setup, "
-                    "or MATLAB could not complete the simulation."
-                )
+                st.error(PVMAPS_RUN_TEXT["simulation_error"])
+                st.write(PVMAPS_RUN_TEXT["simulation_error_detail"])
                 st.code(str(error))
                 st.stop()
 
-            st.subheader("Location")
+            st.subheader(LOCATION_TEXT["result_location_header"])
             st.write(address)
 
-            st.subheader("Result")
+            st.subheader(RESULT_TEXT["result_header"])
             st.write(explain_pvmaps_result(output))
 
-            st.subheader("Monthly Yield")
-            months = ["January", "February", "March", "April","May", "June", "July", "August","September", "October", "November", "December"]
+            st.subheader(RESULT_TEXT["monthly_yield_header"])
 
             fig, ax = plt.subplots(figsize=(10, 5))
-            ax.bar(months, output["monthly_yield"])
-            ax.set_xlabel("Month")
+            ax.bar(MONTH_LABELS, output["monthly_yield"])
+            ax.set_xlabel(RESULT_TEXT["chart_x_label"])
             ax.set_ylabel(f"Yield ({output['yield_unit']})")
-            ax.set_title("Monthly PVMAPS Yield")
+            ax.set_title(RESULT_TEXT["chart_title"])
             ax.tick_params(axis="x", labelrotation=45)
             st.pyplot(fig)
