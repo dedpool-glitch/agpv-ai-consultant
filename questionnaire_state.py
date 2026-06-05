@@ -17,6 +17,9 @@ def update_questionnaire_state(state, field, value, assumed=False):
     if field not in REQUIRED_QUESTIONNAIRE_FIELDS:
         raise ValueError(f"Unknown questionnaire field: {field}")
 
+    if isinstance(value, str) and not value.strip():
+        raise ValueError(f"{field} cannot be empty.")
+
     state[field] = value
 
     if assumed:

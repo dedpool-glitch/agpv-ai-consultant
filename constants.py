@@ -88,6 +88,8 @@ QUESTIONNAIRE_UI_TEXT = {
     "complete_message": "Questionnaire complete!",
     "not_ready_message": "Complete the questionnaire or use defaults before running PVMAPS.",
     "start_first_error": "Please start the questionnaire before running PVMAPS.",
+    "defaults_applied_message": "Defaults have been applied for the remaining answers. You can now run PVMAPS.",
+    "assumptions_header": "Assumptions",
 }
 
 PVMAPS_RUN_TEXT = {

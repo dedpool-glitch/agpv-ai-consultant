@@ -84,38 +84,75 @@ if "coordinates" in st.session_state:
             st.write(QUESTIONNAIRE_UI_TEXT["start_description"])
 
             if st.button(QUESTIONNAIRE_UI_TEXT["start_button"]):
-                st.session_state["questionnaire_state"] = initialize_questionnaire_state()
+                state=initialize_questionnaire_state()
+                first_question = get_next_question(state)
+
+                st.session_state["questionnaire_state"] = state
                 st.session_state["questionnaire_started"] = True
                 st.session_state["questionnaire_ready_to_run"] = False
-                st.rerun()
+                st.session_state["chat_messages"] = [
+                    {
+                        "role": "assistant",
+                        "content": first_question["question"],
+                    }
+                ]
+
+                st.rerun() 
         else:
             state=st.session_state["questionnaire_state"]
             next_question = get_next_question(state)
-
+            for message in st.session_state.get("chat_messages", []):
+                with st.chat_message(message["role"]):
+                    st.write(message["content"])
             if next_question:
                 field=next_question["field"]
                 question=next_question["question"]
-
-                st.write(question)
-                answer=st.text_input(QUESTIONNAIRE_UI_TEXT["answer_label"], key=f"answer_{field}")
-
-                if st.button(QUESTIONNAIRE_UI_TEXT["submit_button"], key=f"submit_{field}"):
+                answer=st.chat_input(QUESTIONNAIRE_UI_TEXT["answer_label"],key="questionnaire_input")
+                if answer:
                   try:
+                    raw_answer = answer
                     if field in NUMERIC_QUESTIONNAIRE_FIELDS:
                         answer=float(answer)
                     update_questionnaire_state(state, field, answer)
                     st.session_state["questionnaire_state"]=state
+                    st.session_state["chat_messages"].append({
+                        "role": "user",
+                        "content": raw_answer,
+                    })
+
+                    next_question = get_next_question(state)
+                    if next_question:
+                        st.session_state["chat_messages"].append({
+                            "role": "assistant",
+                            "content": next_question["question"],
+                        })
+                    else:
+                        st.session_state["questionnaire_ready_to_run"] = True
+                        st.session_state["chat_messages"].append({
+                            "role": "assistant",
+                            "content": QUESTIONNAIRE_UI_TEXT["complete_message"],
+                        })
                     st.rerun()
-                  except ValueError:
-                    st.error(QUESTIONNAIRE_UI_TEXT["numeric_error"].format(field=field))
+                  except ValueError as error:
+                    st.error(str(error))
                 if st.button(QUESTIONNAIRE_UI_TEXT["defaults_button"]):
                     apply_questionnaire_defaults(state)
                     st.session_state["questionnaire_state"] = state
                     st.session_state["questionnaire_ready_to_run"] = True
+                    st.session_state["chat_messages"].append({
+                        "role": "assistant",
+                        "content": QUESTIONNAIRE_UI_TEXT["defaults_applied_message"],
+                    })
                     st.rerun()
             else:
-                st.write(QUESTIONNAIRE_UI_TEXT["complete_message"])
                 st.session_state["questionnaire_ready_to_run"] = True
+
+            if st.session_state.get("questionnaire_ready_to_run", False):
+                assumptions = st.session_state["questionnaire_state"].get("assumptions", [])
+                if assumptions:
+                    st.subheader(QUESTIONNAIRE_UI_TEXT["assumptions_header"])
+                    for assumption in assumptions:
+                        st.write("-", assumption)
 
     can_run_pvmaps = (
         mode == INPUT_MODE["manual"]
