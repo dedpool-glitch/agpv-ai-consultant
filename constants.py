@@ -40,6 +40,11 @@ NUMERIC_QUESTIONNAIRE_FIELDS = {
     "array_elevation",
 }
 
+QUESTIONNAIRE_FIELD_LIMITS = {
+    "tilt": ("tilt_min", "tilt_max", "tilt_range"),
+    "albedo": ("albedo_min", "albedo_max", "albedo_range"),
+}
+
 APP_TITLE = "PVMAPS Solar Yield Demo"
 
 LOCATION_TEXT = {
@@ -134,8 +139,8 @@ PVMAPS_VALIDATION_LIMITS = {
     "tcoeff_max": 0.01,
     "tilt_min": 0,
     "tilt_max": 90,
-    "azimuth_min": 0,
-    "azimuth_max": 360,
+    "azimuth_ew": 90,
+    "azimuth_ns": 180,
     "albedo_min": 0,
     "albedo_max": 1,
 }
@@ -148,7 +153,7 @@ PVMAPS_VALIDATION_MESSAGES = {
     "tcoeff_range": "Temperature coefficient should usually be between 0 and 0.01.",
     "invalid_array_config": "Invalid tracking configuration.",
     "tilt_range": "Tilt must be between 0 and 90 degrees.",
-    "azimuth_range": "Azimuth must be between 0 and 360 degrees.",
+    "azimuth_range": "Azimuth must be either 90 (East-West) or 180 (North-South).",
     "albedo_range": "Albedo must be between 0 and 1.",
     "pitch_positive": "Pitch must be positive.",
     "gs_height_nonnegative": "Ground sculpting height cannot be negative.",

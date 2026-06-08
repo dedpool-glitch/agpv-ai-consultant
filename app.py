@@ -8,7 +8,6 @@ from constants import (
     LOCATION_TEXT,
     MANUAL_INPUT_TEXT,
     MONTH_LABELS,
-    NUMERIC_QUESTIONNAIRE_FIELDS,
     PANEL_DEFAULT_SPECS,
     PVMAPS_RUN_TEXT,
     QUESTIONNAIRE_UI_TEXT,
@@ -20,6 +19,7 @@ from pvmaps_matlab_runner import run_pvmaps
 from pvmaps_result_explainer import explain_pvmaps_result
 from location_geocoder import geocode_location
 from panel_specs import get_panel_models, get_panel_specs
+from questionnaire_parser import parse_questionnaire_answer
 from questionnaire_state import apply_questionnaire_defaults, get_next_question, initialize_questionnaire_state, update_questionnaire_state
 from questionnaire_to_pvmaps import build_pvmaps_input_from_questionnaire
 
@@ -111,9 +111,8 @@ if "coordinates" in st.session_state:
                 if answer:
                   try:
                     raw_answer = answer
-                    if field in NUMERIC_QUESTIONNAIRE_FIELDS:
-                        answer=float(answer)
-                    update_questionnaire_state(state, field, answer)
+                    parsed_answer = parse_questionnaire_answer(field, answer)
+                    update_questionnaire_state(state, field, parsed_answer)
                     st.session_state["questionnaire_state"]=state
                     st.session_state["chat_messages"].append({
                         "role": "user",

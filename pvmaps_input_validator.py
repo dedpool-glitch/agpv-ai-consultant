@@ -30,7 +30,7 @@ def validate_pvmaps_input(data):
     if not (PVMAPS_VALIDATION_LIMITS["tilt_min"] <= data["array"]["tilt"] <= PVMAPS_VALIDATION_LIMITS["tilt_max"]):
         errors.append(PVMAPS_VALIDATION_MESSAGES["tilt_range"])
 
-    if not (PVMAPS_VALIDATION_LIMITS["azimuth_min"] <= data["array"]["azimuth"] <= PVMAPS_VALIDATION_LIMITS["azimuth_max"]):
+    if not (data["array"]["azimuth"] in [PVMAPS_VALIDATION_LIMITS["azimuth_ew"], PVMAPS_VALIDATION_LIMITS["azimuth_ns"]]):
         errors.append(PVMAPS_VALIDATION_MESSAGES["azimuth_range"])
 
     if not (PVMAPS_VALIDATION_LIMITS["albedo_min"] <= data["array"]["albedo"] <= PVMAPS_VALIDATION_LIMITS["albedo_max"]):
