@@ -1,11 +1,10 @@
 # UI
 streamlit
-
 # Plotting
 matplotlib
-
 # Location lookup
 geopy
-
 # MATLAB Engine for Python
 matlabengine
+#for test cases
+pytest
