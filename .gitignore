@@ -1,5 +1,6 @@
 __pycache__/
 *.py[cod]
+.venv/
 #ignore the PV-MAPS-main folder
 PV-MAPS-main/
 docs/progress.md
