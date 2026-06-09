@@ -295,8 +295,9 @@ After the LLM returns structured output:
 
 ```text
 structured output
+-> questionnaire parser validates/parses individual answers
+-> code stores validated structured state
 -> code fills approved defaults
--> code validates individual fields
 -> code validates input combinations
 -> PVMAPS runs
 ```
@@ -323,6 +324,23 @@ record assumptions when values are defaulted
 ```
 
 This acts as the checklist that the future LLM/questionnaire will follow.
+
+### `questionnaire_parser.py`
+
+Validates one submitted answer before it is stored in questionnaire state.
+
+Current responsibilities:
+
+```text
+convert numeric text to float
+reject invalid array configuration answers
+reject unknown panel model answers
+check tilt, albedo, pitch, ground sculpting height, and elevation rules
+restrict azimuth to 90 or 180 for the current demo
+reuse shared validation messages from constants.py where possible
+```
+
+This is important because the final PVMAPS validator only runs after a full input dictionary exists. During the chat/questionnaire flow, the app only has one field answer at a time.
 
 ### `questionnaire_to_pvmaps.py`
 
@@ -371,6 +389,7 @@ before adding the LLM conversation layer.
 - How should common datasheet cell technologies map to PVMAPS labels?
 - Which array configuration should be the default when the user is unsure?
 - What are valid default values for `fixed`, `tracking`, and `GSVBF`?
+- Should azimuth always be limited to 90 and 180 for this project, or should the simulator support more orientations later?
 - Which input combinations should be blocked?
 - Which input combinations should only produce warnings?
 - Should `stc_eff.direct` and `stc_eff.diffuse` usually be equal?
