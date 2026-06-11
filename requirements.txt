@@ -8,3 +8,4 @@ geopy==2.4.1
 matlabengine==25.2.2
 #for test cases
 pytest==9.0.3
+requests
