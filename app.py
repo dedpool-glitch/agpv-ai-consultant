@@ -1,5 +1,7 @@
 import streamlit as st
 import matplotlib.pyplot as plt
+import os
+from dotenv import load_dotenv
 
 from constants import (
     APP_TITLE,
@@ -22,6 +24,10 @@ from panel_specs import get_panel_models, get_panel_specs
 from questionnaire_parser import parse_questionnaire_answer
 from questionnaire_state import apply_questionnaire_defaults, get_next_question, initialize_questionnaire_state, update_questionnaire_state
 from questionnaire_to_pvmaps import build_pvmaps_input_from_questionnaire
+from llm_parameter_extractor import extract_questionnaire_parameter
+
+load_dotenv()
+api_key = os.getenv("PURDUE_GENAI_KEY")
 
 st.title(APP_TITLE)
 
@@ -111,7 +117,13 @@ if "coordinates" in st.session_state:
                 if answer:
                   try:
                     raw_answer = answer
-                    parsed_answer = parse_questionnaire_answer(field, answer)
+                    extracted_answer=extract_questionnaire_parameter(field, question, raw_answer, api_key)
+                    if extracted_answer is None or extracted_answer.get("value") is None:
+                        st.error("Could not extract a valid answer. Please try again with a clearer response.")
+                        st.stop()
+                    value=extracted_answer["value"]
+                    print(value)
+                    parsed_answer = parse_questionnaire_answer(field,value)
                     update_questionnaire_state(state, field, parsed_answer)
                     st.session_state["questionnaire_state"]=state
                     st.session_state["chat_messages"].append({
