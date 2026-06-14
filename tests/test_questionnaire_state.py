@@ -1,5 +1,5 @@
 import pytest
-from questionnaire_state import (
+from questionnaire.state import (
     initialize_questionnaire_state,
     update_questionnaire_state,
     get_next_question,

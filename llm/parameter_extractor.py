@@ -1,5 +1,5 @@
 import json
-from llm_client import call_llm
+from llm.client import call_llm
 from constants import LLM_SYSTEM_PROMPT
 
 def extract_questionnaire_parameter(field,question,user_response,api_key):
@@ -11,8 +11,8 @@ def extract_questionnaire_parameter(field,question,user_response,api_key):
     llm_response=call_llm(messages,api_key)
 
     try:
-        extracted_value=json.loads(llm_response)
+        extracted_json=json.loads(llm_response)
     except json.JSONDecodeError:
-        extracted_value=None
+        extracted_json=None
 
-    return extracted_value
+    return extracted_json

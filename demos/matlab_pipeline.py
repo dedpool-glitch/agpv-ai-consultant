@@ -1,7 +1,7 @@
-from pvmaps_input_builder import create_default_pvmaps_input
-from pvmaps_input_validator import validate_pvmaps_input
-from pvmaps_matlab_runner import run_pvmaps
-from pvmaps_result_explainer import explain_pvmaps_result
+from pvmaps.input_builder import create_default_pvmaps_input
+from pvmaps.input_validator import validate_pvmaps_input
+from pvmaps.matlab_runner import run_pvmaps
+from pvmaps.result_explainer import explain_pvmaps_result
 
 pvmaps_input = create_default_pvmaps_input(32.692, -114.627)
 

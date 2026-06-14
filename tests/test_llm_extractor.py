@@ -1,7 +1,7 @@
 import pytest
 import os
 from dotenv import load_dotenv
-from llm_parameter_extractor import extract_questionnaire_parameter
+from llm.parameter_extractor import extract_questionnaire_parameter
 
 
 @pytest.fixture

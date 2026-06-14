@@ -6,7 +6,7 @@ from constants import (
     PVMAPS_VALIDATION_MESSAGES,
     QUESTIONNAIRE_FIELD_LIMITS,
 )
-from panel_specs import get_panel_models
+from services.panel_specs import get_panel_models
 
 
 def parse_questionnaire_answer(field, answer):

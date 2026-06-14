@@ -1,5 +1,5 @@
-from panel_specs import get_panel_specs
-from pvmaps_input_builder import create_default_pvmaps_input
+from services.panel_specs import get_panel_specs
+from pvmaps.input_builder import create_default_pvmaps_input
 
 
 def build_pvmaps_input_from_questionnaire(state, lat, lon):

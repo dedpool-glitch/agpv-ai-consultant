@@ -1,5 +1,5 @@
 import pytest
-from questionnaire_parser import parse_questionnaire_answer
+from questionnaire.parser import parse_questionnaire_answer
 
 def test_empty_questionnaire_answer():
     with pytest.raises(ValueError):

@@ -1,7 +1,7 @@
-from pvmaps_input_validator import validate_pvmaps_input
-from pvmaps_input_builder import create_default_pvmaps_input
-from pvmaps_mock_runner import run_mock_pvmaps
-from pvmaps_result_explainer import explain_pvmaps_result
+from pvmaps.input_validator import validate_pvmaps_input
+from pvmaps.input_builder import create_default_pvmaps_input
+from pvmaps.mock_runner import run_mock_pvmaps
+from pvmaps.result_explainer import explain_pvmaps_result
 
 pvmaps_input = create_default_pvmaps_input(40.4237, -86.9212) #example
 

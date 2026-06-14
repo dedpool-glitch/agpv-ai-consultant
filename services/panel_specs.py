@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-PANEL_SPECS_PATH = Path(__file__).parent / "data" / "panel_specs.json"
+PANEL_SPECS_PATH = Path(__file__).resolve().parent.parent / "data" / "panel_specs.json"
 
 def load_panel_specs():
     with open(PANEL_SPECS_PATH, "r") as file:
