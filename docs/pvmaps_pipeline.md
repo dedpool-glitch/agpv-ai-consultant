@@ -1,52 +1,80 @@
 # PVMAPS Pipeline
 
-## Current Goal
+## Purpose
 
-Build a small Python pipeline that prepares PVMAPS inputs, validates them, runs a mock PVMAPS simulation, and explains the result.
+This document describes the controlled PVMAPS pipeline used by the Streamlit demo and future LLM-assisted questionnaire.
 
-This is the controlled backend skeleton that will later sit underneath the LLM agent.
-
-## Current Flow
+The key idea is:
 
 ```text
-create_default_pvmaps_input()
--> validate_pvmaps_input()
--> run_mock_pvmaps()
--> explain_pvmaps_result()
+LLM helps collect/interpret inputs
+Python validates and structures inputs
+MATLAB PVMAPS performs the solar simulation
+Python explains the result
 ```
 
-## Files
+## Current Package
 
-### `pvmaps_input_builder.py`
+PVMAPS-related Python code now lives in:
+
+```text
+pvmaps/
+```
+
+Files:
+
+```text
+pvmaps/input_builder.py
+pvmaps/input_validator.py
+pvmaps/mock_runner.py
+pvmaps/matlab_runner.py
+pvmaps/result_explainer.py
+```
+
+## Main Flow
+
+```text
+create_default_pvmaps_input(...)
+-> validate_pvmaps_input(...)
+-> run_pvmaps(...) or run_mock_pvmaps(...)
+-> explain_pvmaps_result(...)
+```
+
+In the app, questionnaire mode adds earlier steps:
+
+```text
+user natural-language answer
+-> llm.parameter_extractor.extract_questionnaire_parameter(...)
+-> questionnaire.parser.parse_questionnaire_answer(...)
+-> questionnaire.state.update_questionnaire_state(...)
+-> questionnaire.to_pvmaps.build_pvmaps_input_from_questionnaire(...)
+-> validate_pvmaps_input(...)
+-> run_pvmaps(...)
+```
+
+## Input Builder
+
+File:
+
+```text
+pvmaps/input_builder.py
+```
 
 Defines:
 
 ```python
-create_default_pvmaps_input(lat, lon)
+create_default_pvmaps_input(...)
 ```
 
-Creates a default PVMAPS-style input dictionary.
+Creates a nested Python dictionary that mirrors the MATLAB PVMAPS input struct.
 
-The dictionary includes:
+## Input Validator
+
+File:
 
 ```text
-lat
-lon
-module.cell_tech
-module.height
-module.stc_eff.direct
-module.stc_eff.diffuse
-module.tcoeff
-array.config
-array.tilt
-array.azimuth
-array.albedo
-array.pitch
-array.gsHeight
-array.elevation
+pvmaps/input_validator.py
 ```
-
-### `pvmaps_input_validator.py`
 
 Defines:
 
@@ -54,113 +82,108 @@ Defines:
 validate_pvmaps_input(data)
 ```
 
-Checks bounds and allowed values for PVMAPS inputs, including latitude, longitude, tilt, azimuth, albedo, pitch, module efficiency, temperature coefficient, and tracking configuration.
+Checks the final complete PVMAPS input dictionary before MATLAB runs.
 
-### `pvmaps_mock_runner.py`
+Current checks:
 
-Defines:
+```text
+allowed cell technology
+allowed array configuration
+module height > 0
+efficiency ranges
+temperature coefficient range
+tilt range
+azimuth allowed values
+albedo range
+pitch > 0
+ground sculpting height >= 0
+array elevation >= 0
+latitude/longitude ranges
+```
 
-```python
-run_mock_pvmaps(pvmaps_input)
+Current azimuth assumption:
+
+```text
+90 = east-west
+180 = north-south
+```
+
+## Mock Runner
+
+File:
+
+```text
+pvmaps/mock_runner.py
 ```
 
 Returns mock PVMAPS output shaped like the real MATLAB output.
 
-Current output fields:
+Purpose:
 
 ```text
-yearly_yield
-monthly_yield
-daily_yield
-yield_unit
-warnings
-assumptions
+test pipeline behavior without launching MATLAB
 ```
 
-### `pvmaps_result_explainer.py`
+## MATLAB Runner
+
+File:
+
+```text
+pvmaps/matlab_runner.py
+```
 
 Defines:
 
 ```python
-explain_pvmaps_result(output)
+run_pvmaps(pvmaps_input, script_path)
 ```
 
-Converts PVMAPS output into readable text for the user.
-
-### `demo_mock_pipeline.py`
-
-Runs the full example pipeline.
-
-It creates default input, validates it, runs the mock PVMAPS function, and prints a readable explanation.
-
-## Current Assumptions
-
-- PVMAPS input is represented as a nested Python dictionary.
-- MATLAB PVMAPS is not connected yet.
-- Mock output is used until the real simulator is available.
-- PVMAPS is treated as the trusted model.
-- We validate inputs before simulation.
-- We are not scientifically validating PVMAPS outputs yet.
-- Later, the final LLM/RAG response should be checked before it is shown to the user.
-
-## MATLAB Integration Demo
-
-The project now includes a real MATLAB PVMAPS runner and a Streamlit technical demo.
-
-### Files
-
-- `pvmaps_matlab_runner.py`
-- `demo_matlab_pipeline.py`
-- `app.py`
-
-### Flow
+Flow:
 
 ```text
-Streamlit/demo script
--> create PVMAPS input dictionary
--> validate input
--> start MATLAB Engine
--> set MATLAB path
--> input = initiate()
--> overwrite input fields
--> output = simulate(input)
--> extract yearly/monthly/daily yield
--> explain result
+start MATLAB Engine
+set MATLAB working folder/path
+call initiate()
+overwrite selected input fields
+call simulate(input)
+extract yearly/monthly/daily yield
+return Python dictionary
 ```
 
-### Path Detail
-
-`script_path` should point to the project root:
+Important path:
 
 ```text
-D:/agpv-ai-consultant/PV-MAPS-main
+script_path = D:/agpv-ai-consultant/PV-MAPS-main
 ```
 
-not directly to:
+## Result Explainer
+
+File:
 
 ```text
-D:/agpv-ai-consultant/PV-MAPS-main/pvmaps
+pvmaps/result_explainer.py
 ```
 
-The MATLAB runner constructs the PVMAPS subpaths internally:
+Turns PVMAPS output into readable text using:
 
 ```text
-script_path/pvmaps
-script_path/pvmaps/data
-script_path/pvmaps/lib/...
+yearly_yield
+monthly_yield
+yield_unit
+assumptions
 ```
 
-### Current Demo Defaults
+## Current Demo Defaults
 
-The known-working demo configuration currently uses:
+Known-working configuration:
 
 ```text
-array.config = tracking
 module.cell_tech = AL_BSF
 module.height = 4.8
 module.stc_eff.direct = 21.8
 module.stc_eff.diffuse = 21.8
 module.tcoeff = 0.0041
+array.config = tracking
 array.tilt = 25
 array.azimuth = 90
 array.albedo = 0.3
@@ -169,29 +192,47 @@ array.gsHeight = 0.5
 array.elevation = 3
 ```
 
-### Known Issue
+## Known Issue
 
-The `fixed` configuration produced an internal PVMAPS error with the current default input set:
+The `fixed` configuration produced:
 
 ```text
 Unrecognized function or variable 'I_gnd_x'
 ```
 
-This does not necessarily mean fixed systems are unsupported. It means fixed systems need separate testing and possibly different compatible defaults.
-
-## Design Principle
+This does not necessarily mean fixed systems are unsupported. It means:
 
 ```text
-LLM handles conversation.
-Code handles numeric mapping and validation.
-PVMAPS handles solar calculation.
-Explanation layer turns results into readable output.
+fixed + current defaults
 ```
 
-## Next Steps
+is not yet confirmed as a valid input combination.
 
-- Add farmer-friendly input mapping.
-- Add NASA POWER data lookup.
-- Replace mock runner with MATLAB PVMAPS runner.
-- Add LLM-guided conversation.
-- Add RAG-based support for research claims and assumptions.
+## Demo Scripts
+
+Command-line demos now live in:
+
+```text
+demos/
+```
+
+Examples:
+
+```powershell
+python -m demos.mock_pipeline
+python -m demos.questionnaire_pipeline
+python -m demos.matlab_pipeline
+```
+
+Use the MATLAB demo only when MATLAB and PV-MAPS paths are available.
+
+## Design Boundary
+
+```text
+LLM = language extraction / future question phrasing
+questionnaire code = state and answer validation
+PVMAPS code = input construction, final validation, simulation
+MATLAB PVMAPS = scientific solar calculation
+```
+
+This boundary is intentional so the LLM does not silently invent or approve simulation values.

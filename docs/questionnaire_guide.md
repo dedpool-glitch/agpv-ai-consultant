@@ -250,7 +250,7 @@ After the app has already collected location:
 
 ## Structured Output
 
-The LLM should return structured output before PVMAPS runs.
+Longer term, the LLM may return a larger structured output before PVMAPS runs.
 
 Example:
 
@@ -289,6 +289,17 @@ Example:
 }
 ```
 
+Current implementation is smaller and safer. The LLM extracts one requested field at a time:
+
+```json
+{
+  "field": "pitch",
+  "value": 10
+}
+```
+
+Then Python validates and stores that value.
+
 ## Handoff To Code
 
 After the LLM returns structured output:
@@ -306,9 +317,9 @@ The LLM should not directly run PVMAPS or bypass validation.
 
 ## Current Backend Implementation
 
-The questionnaire backend has been started in code.
+The questionnaire backend has been started in code and is now organized into packages.
 
-### `questionnaire_state.py`
+### `questionnaire/state.py`
 
 Tracks what the questionnaire has collected.
 
@@ -325,7 +336,7 @@ record assumptions when values are defaulted
 
 This acts as the checklist that the future LLM/questionnaire will follow.
 
-### `questionnaire_parser.py`
+### `questionnaire/parser.py`
 
 Validates one submitted answer before it is stored in questionnaire state.
 
@@ -342,7 +353,7 @@ reuse shared validation messages from constants.py where possible
 
 This is important because the final PVMAPS validator only runs after a full input dictionary exists. During the chat/questionnaire flow, the app only has one field answer at a time.
 
-### `questionnaire_to_pvmaps.py`
+### `questionnaire/to_pvmaps.py`
 
 Converts completed questionnaire state into a PVMAPS input dictionary.
 
@@ -356,7 +367,22 @@ call create_default_pvmaps_input(...)
 return model-ready PVMAPS input
 ```
 
-### `demo_questionnaire_pipeline.py`
+### `llm/parameter_extractor.py`
+
+Extracts one questionnaire field from a natural-language user response.
+
+Current flow:
+
+```text
+field + question + user response
+-> Purdue GenAI Studio API
+-> JSON-like extraction
+-> questionnaire parser validates the extracted value
+```
+
+The LLM does not update questionnaire state directly. It only proposes the extracted value.
+
+### `demos/questionnaire_pipeline.py`
 
 Tests the questionnaire backend without Streamlit or an LLM.
 
@@ -381,7 +407,7 @@ questionnaire answers
 -> simulation output
 ```
 
-before adding the LLM conversation layer.
+without depending on the Streamlit UI.
 
 ## Open Researcher Questions
 

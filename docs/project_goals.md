@@ -95,10 +95,11 @@ The system must collect or fill these PVMAPS inputs:
 ### Code Organization
 
 - Keep static values, labels, defaults, options, and messages in `constants.py`.
-- Keep questionnaire state logic in `questionnaire_state.py`.
-- Keep questionnaire answer parsing and validation in `questionnaire_parser.py`.
-- Keep final PVMAPS input validation in `pvmaps_input_validator.py`.
-- Keep MATLAB execution logic in `pvmaps_matlab_runner.py`.
+- Keep PVMAPS-related logic in `pvmaps/`.
+- Keep questionnaire state, parsing, and conversion logic in `questionnaire/`.
+- Keep LLM API/client and extraction logic in `llm/`.
+- Keep helper services such as geocoding and panel specs lookup in `services/`.
+- Keep demo scripts in `demos/`.
 - Avoid placing too much logic inside `app.py`.
 
 ### Engineering Principles
@@ -119,6 +120,7 @@ The system must collect or fill these PVMAPS inputs:
 - Prioritize tests for `questionnaire_parser.py`, `questionnaire_state.py`, and `pvmaps_input_validator.py`.
 - Test both valid and invalid values.
 - Avoid MATLAB-dependent tests until the smaller functions are stable.
+- Mark live API tests as `integration` so normal tests do not depend on the Purdue GenAI API.
 
 ### LLM Safety Principle
 
@@ -126,15 +128,16 @@ The system must collect or fill these PVMAPS inputs:
 - The LLM should not directly run MATLAB.
 - The LLM should not decide whether a value is valid.
 - The controlled backend should own validation, defaults, state, and PVMAPS execution.
+- The LLM may help make questions more conversational, but code should still decide which required field is being requested.
 
 ## Future Requirements
 
 ### LLM Intake
 
-- Add an LLM layer after the deterministic questionnaire flow is stable.
-- The first LLM job should be extraction, not simulation.
+- Use the LLM for extraction and question phrasing, not simulation.
 - The LLM should convert messy user language into structured field-value pairs.
 - Extracted values must still pass through the questionnaire parser and validators.
+- The backend must remain responsible for state, validation, defaults, and PVMAPS execution.
 
 Example:
 
@@ -173,5 +176,5 @@ Example:
 - The app does not yet optimize solar farm configuration.
 - The app does not yet predict crop yield.
 - The app does not yet use RAG.
-- The app does not yet use an LLM agent.
+- The app does not yet use a full LLM agent.
 - The app does not yet handle all possible real-world solar design constraints.
