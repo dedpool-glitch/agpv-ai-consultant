@@ -25,6 +25,7 @@ from questionnaire.parser import parse_questionnaire_answer
 from questionnaire.state import apply_questionnaire_defaults, get_next_question, initialize_questionnaire_state, update_questionnaire_state
 from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
 from llm.parameter_extractor import extract_questionnaire_parameter
+from llm.question_generator import generate_question
 
 load_dotenv()
 api_key = os.getenv("PURDUE_GENAI_KEY")
@@ -92,6 +93,8 @@ if "coordinates" in st.session_state:
             if st.button(QUESTIONNAIRE_UI_TEXT["start_button"]):
                 state=initialize_questionnaire_state()
                 first_question = get_next_question(state)
+                field=first_question["field"]
+                first_generated_question=generate_question(field, state, api_key)
 
                 st.session_state["questionnaire_state"] = state
                 st.session_state["questionnaire_started"] = True
@@ -99,7 +102,7 @@ if "coordinates" in st.session_state:
                 st.session_state["chat_messages"] = [
                     {
                         "role": "assistant",
-                        "content": first_question["question"],
+                        "content": first_generated_question,
                     }
                 ]
 
@@ -112,7 +115,7 @@ if "coordinates" in st.session_state:
                     st.write(message["content"])
             if next_question:
                 field=next_question["field"]
-                question=next_question["question"]
+                question=generate_question(field, state, api_key)
                 answer=st.chat_input(QUESTIONNAIRE_UI_TEXT["answer_label"],key="questionnaire_input")
                 if answer:
                   try:
@@ -122,6 +125,7 @@ if "coordinates" in st.session_state:
                         st.error("Could not extract a valid answer. Please try again with a clearer response.")
                         st.stop()
                     value=extracted_answer["value"]
+                    print(f"Extracted answer: {value}")
                     parsed_answer = parse_questionnaire_answer(field,value)
                     update_questionnaire_state(state, field, parsed_answer)
                     st.session_state["questionnaire_state"]=state
@@ -132,9 +136,11 @@ if "coordinates" in st.session_state:
 
                     next_question = get_next_question(state)
                     if next_question:
+                        field=next_question["field"]
+                        generated_question=generate_question(field, state, api_key)
                         st.session_state["chat_messages"].append({
                             "role": "assistant",
-                            "content": next_question["question"],
+                            "content": generated_question,
                         })
                     else:
                         st.session_state["questionnaire_ready_to_run"] = True

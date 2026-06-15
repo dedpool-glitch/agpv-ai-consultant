@@ -1,10 +1,10 @@
 import json
 from llm.client import call_llm
-from constants import LLM_SYSTEM_PROMPT
+from constants import LLM_SYSTEM_EXTRACTION_PROMPT
 
 def extract_questionnaire_parameter(field,question,user_response,api_key):
     messages=[
-        {"role":"system","content":LLM_SYSTEM_PROMPT},
+        {"role":"system","content":LLM_SYSTEM_EXTRACTION_PROMPT},
         {"role":"user","content":f"Field: {field}\nQuestion: {question}\nUser Response: {user_response}\nExtract the value for the field in valid JSON format."}
     ]
 
