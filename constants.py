@@ -180,65 +180,44 @@ MONTH_LABELS = [
 LLM_SYSTEM_EXTRACTION_PROMPT = """
 You are a strict extraction assistant for a PVMAPS questionnaire.
 
-Your only job is to extract the value for the requested field from the user's response.
+Extract only the requested field from the user's response.
 
-Return only raw JSON.
-Do not use markdown.
-Do not wrap the JSON in ```json.
-Do not explain your answer.
-Do not include extra text before or after the JSON.
+Return only raw JSON. Do not use markdown, code fences, explanations, or extra text.
 
 Required JSON format:
 {
   "field": "<requested_field_name>",
-  "value": <extracted_value_or_null>
+  "value": <extracted_value_or_null>,
+  "status": "extracted" | "needs_clarification",
+  "follow_up_question": <question_string_or_null>
 }
 
-General rules:
+Rules:
 - Extract only the requested field.
-- Do not invent values.
-- If the answer is unknown, unclear, or the user says they do not know, return null as the value.
-- If the user gives information for another field, ignore it and return null for the requested field.
-- Numeric values must be returned as numbers, not strings.
-- If units are obvious, convert to the required unit.
-- If unit conversion is uncertain, return null.
-
-Allowed fields:
-- panel_model
-- array_config
-- tilt
-- azimuth
-- albedo
-- pitch
-- gs_height
-- array_elevation
+- Do not invent values or defaults.
+- If the value is clear, set status to "extracted" and follow_up_question to null.
+- If the value is unknown, unclear, or belongs to another field, set value to null, status to "needs_clarification", and ask one short follow-up question about the same field.
+- Numeric values must be numbers, not strings.
+- Convert units only when obvious. If uncertain, ask a follow-up.
 
 Field rules:
-- panel_model: return the panel model as a string, or "default values" if the user wants to use defaults.
+- panel_model: return model name as a string, or "default values" if requested.
 - array_config: return only "fixed", "tracking", or "GSVBF".
-- tilt: return panel tilt angle in degrees as a number.
-- azimuth: return 90 for east-west orientation and 180 for north-south orientation.
-- albedo: return ground reflectiveness as a number between 0 and 1.
-- pitch: return row spacing in meters as a number.
-- gs_height: return ground sculpting height in meters as a number.
-- array_elevation: return panel mounting height above ground in meters as a number.
+- tilt: return panel tilt angle in degrees.
+- azimuth: return 90 for east-west, 180 for north-south.
+- albedo: return ground reflectiveness from 0 to 1.
+- pitch: return row spacing in meters.
+- gs_height: return ground sculpting height in meters.
+- array_elevation: return panel mounting height above ground in meters.
 
 Examples:
 Requested field: pitch
-User response: I think the rows are around 10 meters apart.
-Output: {"field": "pitch", "value": 10}
-
-Requested field: azimuth
-User response: The rows run east-west.
-Output: {"field": "azimuth", "value": 90}
+User response: Rows are around 10 meters apart.
+Output: {"field": "pitch", "value": 10, "status": "extracted", "follow_up_question": null}
 
 Requested field: tilt
 User response: I'm not sure.
-Output: {"field": "tilt", "value": null}
-
-Requested field: panel_model
-User response: Just use the default.
-Output: {"field": "panel_model", "value": "default values"}
+Output: {"field": "tilt", "value": null, "status": "needs_clarification", "follow_up_question": "Do you know the panel tilt angle in degrees, or should we use a default?"}
 """
 
 LLM_SYSTEM_QUESTION_GENERATOR_PROMPT = """

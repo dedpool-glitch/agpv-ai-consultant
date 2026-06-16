@@ -95,7 +95,8 @@ if "coordinates" in st.session_state:
                 first_question = get_next_question(state)
                 field=first_question["field"]
                 first_generated_question=generate_question(field, state, api_key)
-
+                st.session_state["active_field"] = field
+                st.session_state["active_question"] = first_generated_question
                 st.session_state["questionnaire_state"] = state
                 st.session_state["questionnaire_started"] = True
                 st.session_state["questionnaire_ready_to_run"] = False
@@ -114,18 +115,41 @@ if "coordinates" in st.session_state:
                 with st.chat_message(message["role"]):
                     st.write(message["content"])
             if next_question:
-                field=next_question["field"]
-                question=generate_question(field, state, api_key)
+                field=st.session_state["active_field"]
+                question=st.session_state["active_question"]
                 answer=st.chat_input(QUESTIONNAIRE_UI_TEXT["answer_label"],key="questionnaire_input")
                 if answer:
                   try:
                     raw_answer = answer
                     extracted_answer=extract_questionnaire_parameter(field, question, raw_answer, api_key)
-                    if extracted_answer is None or extracted_answer.get("value") is None:
-                        st.error("Could not extract a valid answer. Please try again with a clearer response.")
-                        st.stop()
+                    if extracted_answer is None:
+                        st.session_state["chat_messages"].append({
+                            "role": "user",
+                            "content": raw_answer,
+                        })
+
+                        st.session_state["chat_messages"].append({
+                            "role": "assistant",
+                            "content": "I had trouble understanding that. Could you answer again?"
+                        })
+
+                        st.rerun()
+                    if extracted_answer.get("value") is None:
+                        follow_up = extracted_answer.get("follow_up_question") or question
+                        st.session_state["active_question"] = follow_up
+                        st.session_state["chat_messages"].append({
+                            "role": "user",
+                            "content": raw_answer,
+                        })
+
+                        st.session_state["chat_messages"].append({
+                            "role": "assistant",
+                            "content": follow_up,
+                        })
+
+                        st.rerun()
                     value=extracted_answer["value"]
-                    print(f"Extracted answer: {value}")
+                    #print(f"Extracted answer: {value}")
                     parsed_answer = parse_questionnaire_answer(field,value)
                     update_questionnaire_state(state, field, parsed_answer)
                     st.session_state["questionnaire_state"]=state
@@ -138,6 +162,8 @@ if "coordinates" in st.session_state:
                     if next_question:
                         field=next_question["field"]
                         generated_question=generate_question(field, state, api_key)
+                        st.session_state["active_field"] = field
+                        st.session_state["active_question"] = generated_question
                         st.session_state["chat_messages"].append({
                             "role": "assistant",
                             "content": generated_question,

@@ -19,9 +19,3 @@ def call_llm(messages,api_key,model="llama4:latest"):
 
     return response.json()["choices"][0]["message"]["content"]
 
-
-"""messages=[
-    {"role":"user","content":"Please tell me a bit about yourself"}
-]
-response=call_llm(messages,api_key)
-print(response)"""
