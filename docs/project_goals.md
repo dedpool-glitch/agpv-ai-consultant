@@ -136,6 +136,7 @@ The system must collect or fill these PVMAPS inputs:
 
 - Use the LLM for extraction and question phrasing, not simulation.
 - The LLM should convert messy user language into structured field-value pairs.
+- The LLM should phrase required-field questions in simple, nontechnical language.
 - Extracted values must still pass through the questionnaire parser and validators.
 - The backend must remain responsible for state, validation, defaults, and PVMAPS execution.
 

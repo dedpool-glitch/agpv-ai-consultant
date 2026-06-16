@@ -289,7 +289,16 @@ Example:
 }
 ```
 
-Current implementation is smaller and safer. The LLM extracts one requested field at a time:
+Current implementation is smaller and safer. Code chooses the next required field, the LLM phrases the question, and the LLM extracts one requested field at a time:
+
+```text
+questionnaire state chooses field
+-> LLM generates user-friendly question
+-> user answers
+-> LLM extracts value for that same field
+-> parser validates value
+-> state updates
+```
 
 ```json
 {
@@ -381,6 +390,20 @@ field + question + user response
 ```
 
 The LLM does not update questionnaire state directly. It only proposes the extracted value.
+
+### `llm/question_generator.py`
+
+Generates a natural-language question for the next required questionnaire field.
+
+Current flow:
+
+```text
+field + questionnaire state
+-> Purdue GenAI Studio API
+-> one short user-friendly question
+```
+
+The code still decides which field is needed. The LLM only decides how to phrase the question.
 
 ### `demos/questionnaire_pipeline.py`
 

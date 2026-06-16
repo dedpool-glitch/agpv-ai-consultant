@@ -43,6 +43,8 @@ create_default_pvmaps_input(...)
 In the app, questionnaire mode adds earlier steps:
 
 ```text
+questionnaire state selects next required field
+-> llm.question_generator.generate_question(...)
 user natural-language answer
 -> llm.parameter_extractor.extract_questionnaire_parameter(...)
 -> questionnaire.parser.parse_questionnaire_answer(...)
@@ -229,7 +231,7 @@ Use the MATLAB demo only when MATLAB and PV-MAPS paths are available.
 ## Design Boundary
 
 ```text
-LLM = language extraction / future question phrasing
+LLM = question phrasing and language extraction
 questionnaire code = state and answer validation
 PVMAPS code = input construction, final validation, simulation
 MATLAB PVMAPS = scientific solar calculation

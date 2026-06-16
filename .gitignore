@@ -7,3 +7,4 @@ docs/progress.md
 tmp_mlx_media/
 data/panel_specs.json
 .env
+outputs/
