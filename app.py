@@ -18,7 +18,6 @@ from constants import (
 from pvmaps.input_builder import create_default_pvmaps_input
 from pvmaps.input_validator import validate_pvmaps_input
 from pvmaps.matlab_runner import run_pvmaps
-from pvmaps.result_explainer import explain_pvmaps_result
 from services.location_geocoder import geocode_location
 from services.panel_specs import get_panel_models, get_panel_specs
 from questionnaire.parser import parse_questionnaire_answer
