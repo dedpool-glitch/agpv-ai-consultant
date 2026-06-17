@@ -89,6 +89,7 @@ The system must collect or fill these PVMAPS inputs:
 - The app must display a natural-language result summary.
 - The app must display monthly yield values in a readable chart.
 - Month labels should be readable.
+- Future LLM-generated summaries must be based only on validated model outputs and explicit assumptions.
 
 ## Advisory Requirements
 
@@ -129,6 +130,7 @@ The system must collect or fill these PVMAPS inputs:
 - The LLM should not decide whether a value is valid.
 - The controlled backend should own validation, defaults, state, and PVMAPS execution.
 - The LLM may help make questions more conversational, but code should still decide which required field is being requested.
+- The LLM may explain final outputs, but it must not change model-produced numbers.
 
 ## Future Requirements
 
@@ -169,6 +171,7 @@ Example:
 - Goal-based configuration suggestions.
 - NASA POWER integration beyond geocoding, if needed.
 - Crop-yield model integration.
+- Additional model modules such as SIMPLE.
 - Map visualization.
 - PDF report generation.
 

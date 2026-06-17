@@ -238,3 +238,17 @@ MATLAB PVMAPS = scientific solar calculation
 ```
 
 This boundary is intentional so the LLM does not silently invent or approve simulation values.
+
+## Future Output Explanation
+
+A planned improvement is to let the LLM generate a more conversational final explanation from the validated PVMAPS output.
+
+Safe flow:
+
+```text
+PVMAPS output
+-> Python extracts yearly yield, monthly yield, units, assumptions
+-> LLM writes a farmer-readable explanation
+```
+
+The LLM should not modify the yield values or introduce unsupported claims. It should only explain the validated model output in clearer language.
