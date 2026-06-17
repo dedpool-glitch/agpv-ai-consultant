@@ -26,6 +26,7 @@ from questionnaire.state import apply_questionnaire_defaults, get_next_question,
 from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
 from llm.parameter_extractor import extract_questionnaire_parameter
 from llm.question_generator import generate_question
+from llm.output_generator import explain_output
 
 load_dotenv()
 api_key = os.getenv("PURDUE_GENAI_KEY")
@@ -255,7 +256,7 @@ if "coordinates" in st.session_state:
             st.write(address)
 
             st.subheader(RESULT_TEXT["result_header"])
-            st.write(explain_pvmaps_result(output))
+            st.write(explain_output(output, api_key))
 
             st.subheader(RESULT_TEXT["monthly_yield_header"])
 

@@ -47,7 +47,7 @@ def run_pvmaps(pvmaps_input, script_path):
         "daily_yield": list(pvmaps_output["daily_yield"][0]),
         "yield_unit": str(pvmaps_output["yield_unit"]),
         "warnings": [],
-        "assumptions": {
+        "final_inputs": {
             "model": "PVMAPS",
             "lat": pvmaps_input["lat"],
             "lon": pvmaps_input["lon"],
