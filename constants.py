@@ -177,6 +177,30 @@ MONTH_LABELS = [
     "December",
 ]
 
+USER_PROFILE_TEXT={
+    "header":"Tell us about yourself and your background to help us tailor the experience.",
+    "user_type_label":"Which of these best describes you?",
+    "solar_experience_label":"How would you describe your experience with solar farm design?",
+    "submit_button":"Submit profile",
+}
+
+USER_TYPE_OPTIONS = [
+    "Farmer",
+    "Landowner",
+    "Researcher",
+    "Solar developer",
+    "Policymaker",
+    "Other",
+]
+
+SOLAR_EXPERIENCE_OPTIONS = [
+    "I am new to solar farm design",
+    "I know basic solar terms but have not worked on a project",
+    "I have evaluated solar options as a landowner, farmer, or decision-maker",
+    "I have technical experience designing or modeling solar systems",
+]
+
+
 LLM_SYSTEM_EXTRACTION_PROMPT = """
 You are a strict extraction assistant for a PVMAPS questionnaire.
 
@@ -245,6 +269,13 @@ Field guidance:
 - gs_height: Ask whether the design includes ground sculpting; if yes, ask whether they know the height.
 - array_elevation: Ask whether they know how high the panels will be mounted above the ground.
 
+Profile adaptation:
+- Use the user profile to adjust wording and technical depth.
+- For users new to solar farm design, avoid jargon and mention that a typical/default value can be used.
+- For technical users, you may use precise solar design terms.
+- For farmers or landowners, frame questions around practical project details.
+- The profile should affect wording only, not the requested field.
+
 Return only the question text. Do not include extra formatting or explanation.
 """
 
@@ -265,4 +296,11 @@ Rules:
 - Do not estimate cost, profit, payback, or financial return.
 - Do not make recommendations beyond what the simulation output supports.
 - If something is not provided, say it is not available instead of guessing.
+
+Profile adaptation:
+- Use the user profile to choose the explanation style.
+- If the user is new to solar farm design, explain terms simply and avoid jargon.
+- If the user has technical/modeling experience, include slightly more technical detail.
+- If the user is a farmer or landowner, focus on practical interpretation of the solar-yield result.
+- Do not change, reinterpret, or invent simulation numbers based on the profile.
 """

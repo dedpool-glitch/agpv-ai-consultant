@@ -14,6 +14,9 @@ from constants import (
     PVMAPS_RUN_TEXT,
     QUESTIONNAIRE_UI_TEXT,
     RESULT_TEXT,
+    USER_PROFILE_TEXT,
+    USER_TYPE_OPTIONS,
+    SOLAR_EXPERIENCE_OPTIONS
 )
 from pvmaps.input_builder import create_default_pvmaps_input
 from pvmaps.input_validator import validate_pvmaps_input
@@ -47,6 +50,21 @@ if "coordinates" in st.session_state:
     lat=coordinates["latitude"]
     lon=coordinates["longitude"]
     address=coordinates["address"]
+
+    if "user_profile" not in st.session_state:
+        st.subheader(USER_PROFILE_TEXT["header"])
+        with st.form("user_profile_form"):
+            user_type = st.selectbox(USER_PROFILE_TEXT["user_type_label"], options=USER_TYPE_OPTIONS)
+            solar_experience = st.selectbox(USER_PROFILE_TEXT["solar_experience_label"], options=SOLAR_EXPERIENCE_OPTIONS)
+            submit_button=st.form_submit_button(USER_PROFILE_TEXT["submit_button"])
+
+            if submit_button:
+                st.session_state["user_profile"] = {
+                    "user_type": user_type,
+                    "solar_experience": solar_experience,
+                }
+                st.rerun()
+        st.stop()
 
     st.subheader(LOCATION_TEXT["matched_location_header"])
     st.write(f"Latitude: {lat}, Longitude: {lon}")
@@ -94,7 +112,7 @@ if "coordinates" in st.session_state:
                 state=initialize_questionnaire_state()
                 first_question = get_next_question(state)
                 field=first_question["field"]
-                first_generated_question=generate_question(field, state, api_key)
+                first_generated_question=generate_question(field, state, api_key, st.session_state.get("user_profile"))
                 st.session_state["active_field"] = field
                 st.session_state["active_question"] = first_generated_question
                 st.session_state["questionnaire_state"] = state
@@ -161,7 +179,7 @@ if "coordinates" in st.session_state:
                     next_question = get_next_question(state)
                     if next_question:
                         field=next_question["field"]
-                        generated_question=generate_question(field, state, api_key)
+                        generated_question=generate_question(field, state, api_key, st.session_state.get("user_profile"))
                         st.session_state["active_field"] = field
                         st.session_state["active_question"] = generated_question
                         st.session_state["chat_messages"].append({
@@ -255,7 +273,7 @@ if "coordinates" in st.session_state:
             st.write(address)
 
             st.subheader(RESULT_TEXT["result_header"])
-            st.write(explain_output(output, api_key))
+            st.write(explain_output(output, api_key, st.session_state.get("user_profile")))
 
             st.subheader(RESULT_TEXT["monthly_yield_header"])
 
