@@ -16,7 +16,8 @@ from constants import (
     RESULT_TEXT,
     USER_PROFILE_TEXT,
     USER_TYPE_OPTIONS,
-    SOLAR_EXPERIENCE_OPTIONS
+    SOLAR_EXPERIENCE_OPTIONS,
+    DATASHEET_UPLOAD_TEXT
 )
 from pvmaps.input_builder import create_default_pvmaps_input
 from pvmaps.input_validator import validate_pvmaps_input
@@ -57,8 +58,16 @@ if "coordinates" in st.session_state:
             user_type = st.selectbox(USER_PROFILE_TEXT["user_type_label"], options=USER_TYPE_OPTIONS)
             solar_experience = st.selectbox(USER_PROFILE_TEXT["solar_experience_label"], options=SOLAR_EXPERIENCE_OPTIONS)
             submit_button=st.form_submit_button(USER_PROFILE_TEXT["submit_button"])
+            datasheet=st.file_uploader(DATASHEET_UPLOAD_TEXT["label"], type=["pdf"], help=DATASHEET_UPLOAD_TEXT["help"])
+
 
             if submit_button:
+                if datasheet:
+                    st.session_state["datasheet"]={
+                        "name": datasheet.name,
+                        "type": datasheet.type,
+                        "bytes": datasheet.getvalue(),
+                    }
                 st.session_state["user_profile"] = {
                     "user_type": user_type,
                     "solar_experience": solar_experience,
@@ -68,6 +77,10 @@ if "coordinates" in st.session_state:
 
     st.subheader(LOCATION_TEXT["matched_location_header"])
     st.write(f"Latitude: {lat}, Longitude: {lon}")
+
+    if "datasheet" in st.session_state:
+        st.success(DATASHEET_UPLOAD_TEXT["success"])
+        st.write(f"{DATASHEET_UPLOAD_TEXT['uploaded_file_label']}: {st.session_state['datasheet']['name']}")
 
     mode=st.radio(INPUT_MODE["label"], options=[INPUT_MODE["questionnaire"], INPUT_MODE["manual"]], index=None)
 

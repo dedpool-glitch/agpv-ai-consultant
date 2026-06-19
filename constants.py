@@ -200,6 +200,12 @@ SOLAR_EXPERIENCE_OPTIONS = [
     "I have technical experience designing or modeling solar systems",
 ]
 
+DATASHEET_UPLOAD_TEXT = {
+    "label": "Upload a solar panel datasheet",
+    "help": "Optional PDF upload. We will use this later to extract panel specifications.",
+    "success": "Datasheet uploaded successfully.",
+    "uploaded_file_label": "Uploaded datasheet",
+}
 
 LLM_SYSTEM_EXTRACTION_PROMPT = """
 You are a strict extraction assistant for a PVMAPS questionnaire.
