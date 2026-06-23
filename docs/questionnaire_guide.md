@@ -8,6 +8,8 @@ The app handles location before the questionnaire starts:
 
 ```text
 user enters location
+-> user provides profile/background
+-> user may upload panel datasheet
 -> LLM questionnaire collects remaining PVMAPS inputs
 ```
 
@@ -33,6 +35,8 @@ The LLM should collect information, ask clarifying questions, summarize assumpti
 - If a user gives a vague answer, ask one clarifying follow-up.
 - If the user gives a panel company but no model, ask for the model number or datasheet.
 - If the user does not have a datasheet/model, ask whether a representative/default module should be used.
+- Use the user profile to adjust wording and technical depth.
+- Do not let the user profile change the required field or simulation values.
 
 
 ## Inputs To Collect
@@ -68,6 +72,13 @@ cell technology
 module height
 module efficiency
 temperature coefficient of Pmax
+```
+
+Current implementation note:
+
+```text
+The app can accept an optional uploaded datasheet PDF and store it in session state.
+Text/spec extraction from the uploaded PDF is a future step.
 ```
 
 Notes:
@@ -398,12 +409,26 @@ Generates a natural-language question for the next required questionnaire field.
 Current flow:
 
 ```text
-field + questionnaire state
+field + questionnaire state + user profile
 -> Purdue GenAI Studio API
 -> one short user-friendly question
 ```
 
 The code still decides which field is needed. The LLM only decides how to phrase the question.
+
+### `llm/output_generator.py`
+
+Generates a plain-language explanation from validated PVMAPS output.
+
+Current flow:
+
+```text
+PVMAPS output + user profile
+-> Purdue GenAI Studio API
+-> concise user-facing explanation
+```
+
+The LLM should explain the output but not change numbers, units, or scientific claims.
 
 ### `demos/questionnaire_pipeline.py`
 

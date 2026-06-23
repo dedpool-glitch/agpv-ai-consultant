@@ -15,6 +15,8 @@ The current focus is not full agrivoltaic decision support yet. Crop-yield model
 - The user must be able to enter a farm location in natural language.
 - The app must convert the location into latitude and longitude using the geocoder.
 - The matched address must be displayed separately from the coordinates.
+- The app should collect a small user profile so explanations can be adjusted to the user's background.
+- The app should allow optional solar panel datasheet upload.
 - The user must choose an input mode before running PVMAPS.
 - The app must support manual input mode.
 - The app must support guided questionnaire mode.
@@ -44,6 +46,7 @@ The system must collect or fill these PVMAPS inputs:
 - If the user does not know the panel model, the system may use explicit default panel specs.
 - Defaults must not be hidden from the user.
 - Datasheet-derived panel specs should be stored in `panel_specs.json`.
+- Uploaded datasheets should be stored first, then parsed/extracted in a later step.
 - For now, direct and diffuse efficiency can both use the datasheet module efficiency, based on Jabir's guidance.
 - For now, `AL_BSF` can be used as the default cell technology, based on Jabir's guidance.
 
@@ -131,6 +134,7 @@ The system must collect or fill these PVMAPS inputs:
 - The controlled backend should own validation, defaults, state, and PVMAPS execution.
 - The LLM may help make questions more conversational, but code should still decide which required field is being requested.
 - The LLM may explain final outputs, but it must not change model-produced numbers.
+- The user profile may change explanation style, but it must not change model inputs or outputs.
 
 ## Future Requirements
 
@@ -154,6 +158,7 @@ Example:
 ### Datasheet Extraction
 
 - Allow users to upload or reference a solar panel datasheet.
+- Store uploaded PDF metadata/content before attempting extraction.
 - Use an LLM or parser to extract panel specs from the datasheet.
 - Store extracted specs in a structured dictionary before using them.
 - Validate extracted specs before using them in PVMAPS.
