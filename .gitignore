@@ -9,3 +9,4 @@ data/panel_specs.json
 .env
 outputs/
 papers/
+candidate_history.csv

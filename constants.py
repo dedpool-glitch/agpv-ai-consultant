@@ -162,6 +162,49 @@ PVMAPS_VALIDATION_MESSAGES = {
     "lon_range": "Longitude must be between -180 and 180.",
 }
 
+PVMAPS_FIELD_SCHEMA = {
+    "panel_model": {
+        "type": "string",
+        "allowed": ["default values"],
+        "note": "Use stored panel model name or default values."
+    },
+    "array_config": {
+        "type": "string",
+        "allowed": ARRAY_CONFIG_OPTIONS,
+    },
+    "tilt": {
+        "type": "number",
+        "min": 0,
+        "max": 90,
+        "unit": "degrees",
+    },
+    "azimuth": {
+        "type": "number",
+        "allowed": [90, 180],
+        "unit": "degrees",
+    },
+    "albedo": {
+        "type": "number",
+        "min": 0,
+        "max": 1,
+    },
+    "pitch": {
+        "type": "number",
+        "min_exclusive": 0,
+        "unit": "meters",
+    },
+    "gs_height": {
+        "type": "number",
+        "min": 0,
+        "unit": "meters",
+    },
+    "array_elevation": {
+        "type": "number",
+        "min": 0,
+        "unit": "meters",
+    },
+}
+
 #tcoeff=0.004 - default value
 
 MONTH_LABELS = [
@@ -311,4 +354,43 @@ Profile adaptation:
 - If the user has technical/modeling experience, include slightly more technical detail.
 - If the user is a farmer or landowner, focus on practical interpretation of the solar-yield result.
 - Do not change, reinterpret, or invent simulation numbers based on the profile.
+"""
+
+LLM_SYSTEM_CANDIDATE_CONFIG_PROMPT = """
+You generate one candidate configuration for a PVMAPS solar-yield simulation.
+
+Return only raw JSON.
+Do not use markdown.
+Do not include text before or after the JSON.
+
+Required JSON format:
+{
+  "candidate_name": "<short descriptive name>",
+  "pvmaps_inputs": {
+    "panel_model": "<allowed value>",
+    "array_config": "<allowed value>",
+    "tilt": <number>,
+    "azimuth": <number>,
+    "albedo": <number>,
+    "pitch": <number>,
+    "gs_height": <number>,
+    "array_elevation": <number>
+  },
+  "justifications": {
+    "panel_model": "<justification>",
+    "array_config": "<justification>",
+    "tilt": "<justification>",
+    "azimuth": "<justification>",
+    "albedo": "<justification>",
+    "pitch": "<justification>",
+    "gs_height": "<justification>",
+    "array_elevation": "<justification>"
+  }
+}
+
+Rules:
+- Use the provided field schema for allowed values, bounds, and units.
+- Use the provided climate summary as context, if needed.
+- Use "default values" for panel_model unless a specific validated panel model is available.
+- Do not invent unsupported fields.
 """
