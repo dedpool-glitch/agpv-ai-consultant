@@ -162,6 +162,8 @@ PVMAPS_VALIDATION_MESSAGES = {
     "lon_range": "Longitude must be between -180 and 180.",
 }
 
+#tcoeff=0.004 - default value
+
 MONTH_LABELS = [
     "January",
     "February",
@@ -202,7 +204,7 @@ SOLAR_EXPERIENCE_OPTIONS = [
 
 DATASHEET_UPLOAD_TEXT = {
     "label": "Upload a solar panel datasheet",
-    "help": "Optional PDF upload. We will use this later to extract panel specifications.",
+    "help": "Optional PDF upload.",
     "success": "Datasheet uploaded successfully.",
     "uploaded_file_label": "Uploaded datasheet",
 }
