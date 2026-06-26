@@ -61,5 +61,5 @@ tests/          unit and integration tests
 docs/           design and progress documentation
 ```
 ### Todo 
-[ ] Foobar 1
-[ ] Foobar 2 
+- [ ] Foobar 1
+- [ ] Foobar 2 
