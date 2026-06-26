@@ -1,38 +1,62 @@
-This project contains code related to creating an AI consultant for farmers in the AGPV domain.
-
 # AgPV AI Consultant
 
-AI-powered decision support tool for agrivoltaic planning.
+An AI-assisted agrivoltaic planning prototype built around Purdue's MATLAB
+PVMAPS solar-yield simulator.
 
 ## Goal
 
-Help farmers and researchers estimate solar/crop tradeoffs for agrivoltaic systems using climate data, PVMAPS-style solar modeling, crop modeling, and LLM-based explanation.
+Help farmers and researchers explore solar-farm configurations through
+farmer-friendly input collection, climate context, validated PVMAPS
+simulations, and plain-language explanations.
 
-## Core Flow
+The current prototype estimates solar yield. Crop-yield modeling and combined
+solar/crop decision support are future extensions.
 
-User input
-→ validate inputs
-→ fetch NASA POWER climate data
-→ prepare PVMAPS inputs
-→ run/lookup solar model
-→ validate outputs
-→ explain results
+## Current Flows
 
-## Planned Components
+### Guided Input
 
-- Streamlit UI
-- Input schemas and validators
-- NASA POWER data access
-- PVMAPS runner
-- Output validator
-- LLM explanation layer
-- RAG over papers/notes
-- Report generation
+```text
+location and user profile
+-> manual input or LLM-assisted questionnaire
+-> answer and full-input validation
+-> MATLAB PVMAPS
+-> monthly/yearly yield
+-> LLM-generated explanation
+```
 
-## MVP
+### Experimental Candidate Generation
 
-- Farmer-friendly input form
-- Location to latitude/longitude
-- NASA climate lookup
-- Mock PVMAPS output
-- Plain-English explanation
+```text
+natural-language location
+-> geocoding
+-> nearest NASA climate grid lookup
+-> LLM proposes one PVMAPS candidate configuration with justifications
+-> deterministic validation
+-> PVMAPS-ready input
+-> append candidate and location to CSV history
+```
+
+The candidate is a model-generated proposal, not a proven optimum.
+
+## Technology
+
+- Python and Streamlit
+- Purdue GenAI Studio API
+- MATLAB Engine and PVMAPS
+- pandas and SciPy
+- geopy
+- pytest
+
+## Project Structure
+
+```text
+app.py          Streamlit interface
+pvmaps/         PVMAPS builders, validators, runners, and result explanation
+questionnaire/  state, answer parsing, and PVMAPS conversion
+llm/            API client, extraction, questions, output, and candidates
+services/       geocoding, panel specs, NASA lookup, and CSV reporting
+demos/          isolated command-line pipelines
+tests/          unit and integration tests
+docs/           design and progress documentation
+```

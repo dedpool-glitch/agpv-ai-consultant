@@ -335,6 +335,26 @@ structured output
 
 The LLM should not directly run PVMAPS or bypass validation.
 
+## Relationship To Candidate Generation
+
+The questionnaire parser and PVMAPS conversion functions are reused by the
+experimental candidate generator:
+
+```text
+LLM proposes a complete configuration
+-> validate_candidate_config(...)
+-> parse_questionnaire_answer(...) validates each field
+-> build_pvmaps_input_from_questionnaire(...) adds module specs and location
+-> validate_pvmaps_input(...) validates the complete nested input
+```
+
+This reuse is intentional. User answers and LLM-generated proposals should
+not have separate definitions of valid PVMAPS values.
+
+The candidate path does not replace the questionnaire. It provides a baseline
+for comparing general-LLM suggestions with future research-paper/RAG-guided
+suggestions.
+
 ## Current Backend Implementation
 
 The questionnaire backend has been started in code and is now organized into packages.
@@ -429,6 +449,20 @@ PVMAPS output + user profile
 ```
 
 The LLM should explain the output but not change numbers, units, or scientific claims.
+
+### Candidate Configuration Files
+
+```text
+llm/candidate_config_generator.py
+llm/candidate_config_validator.py
+services/candidate_report.py
+demos/candidate_config_pipeline.py
+```
+
+These files generate one complete candidate, validate it using the existing
+questionnaire rules, and append the accepted configuration and location to a
+CSV history. The LLM's justifications are stored for review but are not
+treated as verified references.
 
 ### `demos/questionnaire_pipeline.py`
 

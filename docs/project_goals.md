@@ -6,7 +6,13 @@ This document captures the project goals and engineering requirements discussed 
 
 The current system is a PVMAPS solar-yield demo. It should collect or infer the inputs needed by PVMAPS, validate them, run the MATLAB PVMAPS simulator, and show the output in a farmer-readable interface.
 
-The current focus is not full agrivoltaic decision support yet. Crop-yield modeling, optimization, report generation, maps, and RAG over research papers are future extensions.
+The current focus is not full agrivoltaic decision support yet. Crop-yield
+modeling, true optimization, report generation, maps, and RAG over research
+papers are future extensions.
+
+The current experimental goal is to establish a reproducible baseline in which
+a general LLM proposes a PVMAPS configuration from location and climate
+context. This will later be compared with a research-paper/RAG-guided proposal.
 
 ## Mandatory Requirements
 
@@ -94,6 +100,18 @@ The system must collect or fill these PVMAPS inputs:
 - Month labels should be readable.
 - Future LLM-generated summaries must be based only on validated model outputs and explicit assumptions.
 
+### Experimental Candidate Generation
+
+- The system may ask the LLM to propose one complete candidate configuration.
+- The candidate must use the shared PVMAPS field schema.
+- The candidate must include a concise justification for every selected field.
+- Every proposed value must pass the questionnaire parser.
+- The complete PVMAPS input must pass final validation.
+- Location must come from the geocoder, not an invented LLM coordinate.
+- Climate context must come from the NASA lookup service.
+- Accepted candidates must be appended to a CSV run history.
+- The stored record must include location, coordinates, values, and justifications.
+
 ## Advisory Requirements
 
 ### Code Organization
@@ -103,6 +121,7 @@ The system must collect or fill these PVMAPS inputs:
 - Keep questionnaire state, parsing, and conversion logic in `questionnaire/`.
 - Keep LLM API/client and extraction logic in `llm/`.
 - Keep helper services such as geocoding and panel specs lookup in `services/`.
+- Keep NASA climate lookup and candidate reporting in `services/`.
 - Keep demo scripts in `demos/`.
 - Avoid placing too much logic inside `app.py`.
 
@@ -129,12 +148,14 @@ The system must collect or fill these PVMAPS inputs:
 ### LLM Safety Principle
 
 - The LLM should not invent simulation values silently.
+- LLM-generated candidate values must be labeled as proposals.
 - The LLM should not directly run MATLAB.
 - The LLM should not decide whether a value is valid.
 - The controlled backend should own validation, defaults, state, and PVMAPS execution.
 - The LLM may help make questions more conversational, but code should still decide which required field is being requested.
 - The LLM may explain final outputs, but it must not change model-produced numbers.
 - The user profile may change explanation style, but it must not change model inputs or outputs.
+- LLM justifications must not be presented as verified sources or hidden reasoning.
 
 ## Future Requirements
 
@@ -174,7 +195,8 @@ Example:
 
 - RAG over project documents and research papers.
 - Goal-based configuration suggestions.
-- NASA POWER integration beyond geocoding, if needed.
+- RAG-guided configuration generation using the research group's papers.
+- Side-by-side simulation comparison of general-LLM and RAG candidates.
 - Crop-yield model integration.
 - Additional model modules such as SIMPLE.
 - Map visualization.
@@ -183,6 +205,7 @@ Example:
 ## Current Non-Goals
 
 - The app does not yet optimize solar farm configuration.
+- Candidate generation is not equivalent to scientific optimization.
 - The app does not yet predict crop yield.
 - The app does not yet use RAG.
 - The app does not yet use a full LLM agent.

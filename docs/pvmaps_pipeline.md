@@ -13,6 +13,10 @@ MATLAB PVMAPS performs the solar simulation
 Python explains the result
 ```
 
+The project also has an experimental configuration-suggestion path. The LLM
+may propose values, but Python remains responsible for parsing, validation,
+model construction, and execution.
+
 ## Current Package
 
 PVMAPS-related Python code now lives in:
@@ -53,6 +57,28 @@ user natural-language answer
 -> validate_pvmaps_input(...)
 -> run_pvmaps(...)
 ```
+
+## Experimental Candidate Flow
+
+```text
+natural-language location
+-> services.location_geocoder.geocode_location(...)
+-> services.nasa_power_lookup.get_climate_summary(...)
+-> llm.candidate_config_generator.generate_candidate_config(...)
+-> llm.candidate_config_validator.validate_candidate_config(...)
+-> questionnaire.to_pvmaps.build_pvmaps_input_from_questionnaire(...)
+-> pvmaps.input_validator.validate_pvmaps_input(...)
+-> services.candidate_report.append_candidate_to_csv(...)
+```
+
+The candidate JSON contains a candidate name, PVMAPS questionnaire fields,
+and one concise justification per field.
+
+The generator receives only the location, a small NASA climate summary, and
+the shared `PVMAPS_FIELD_SCHEMA`. It does not receive the full NASA CSV.
+
+The candidate is a proposal, not a verified optimum. Its justifications are
+audit notes, not scientific sources.
 
 ## Input Builder
 
@@ -228,6 +254,15 @@ python -m demos.matlab_pipeline
 
 Use the MATLAB demo only when MATLAB and PV-MAPS paths are available.
 
+Candidate demo:
+
+```powershell
+python -m demos.candidate_config_pipeline
+```
+
+Accepted candidates are appended to `candidate_history.csv`. This file is
+runtime output and is excluded from Git.
+
 ## Design Boundary
 
 ```text
@@ -239,9 +274,10 @@ MATLAB PVMAPS = scientific solar calculation
 
 This boundary is intentional so the LLM does not silently invent or approve simulation values.
 
-## Future Output Explanation
+## Output Explanation
 
-A planned improvement is to let the LLM generate a more conversational final explanation from the validated PVMAPS output.
+The project can ask the LLM to generate a conversational final explanation
+from validated PVMAPS output.
 
 Safe flow:
 
@@ -252,3 +288,15 @@ PVMAPS output
 ```
 
 The LLM should not modify the yield values or introduce unsupported claims. It should only explain the validated model output in clearer language.
+
+## Next Candidate Step
+
+The candidate demo currently stops after building and validating the complete
+PVMAPS input. The next flow is:
+
+```text
+validated candidate
+-> MATLAB PVMAPS
+-> save yearly/monthly yield with the candidate record
+-> compare candidates under the same location and conditions
+```

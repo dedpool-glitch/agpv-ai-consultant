@@ -21,6 +21,10 @@ user conversation
 
 The LLM may help collect inputs and explain outputs, but it should not invent model inputs, bypass validation, or calculate scientific outputs itself.
 
+The experimental candidate-generation flow allows the LLM to propose inputs,
+but every proposed value must still pass the same deterministic validators
+before it can reach a simulation model.
+
 ## Current PVMAPS Interface
 
 PVMAPS currently follows this pattern:
@@ -43,6 +47,20 @@ pvmaps/matlab_runner.py
 pvmaps/mock_runner.py
 pvmaps/result_explainer.py
 ```
+
+An experimental alternative input path is:
+
+```text
+location
+-> NASA climate summary
+-> LLM candidate configuration + concise justifications
+-> validate_candidate_config(...)
+-> build_pvmaps_input_from_questionnaire(...)
+-> validate_pvmaps_input(...)
+-> PVMAPS-ready input
+```
+
+The candidate is a baseline proposal, not a proven optimized configuration.
 
 ## Recommended Pattern For Future Models
 
@@ -115,6 +133,7 @@ asking model-specific questions
 extracting structured inputs from conversation
 explaining validated model outputs in plain language
 helping route a user request to the correct model
+proposing candidate inputs when the application requests a design suggestion
 ```
 
 The backend should still control:
@@ -125,6 +144,7 @@ validation rules
 defaults
 model execution
 scientific output values
+acceptance or rejection of LLM-generated candidates
 ```
 
 ## LLM-Generated Output Summaries
@@ -186,12 +206,13 @@ conversation -> structured state -> model input -> model output -> explanation
 
 ## Current Design Decision
 
-For now, keep PVMAPS stable first.
-
-Next useful step:
+PVMAPS remains the first stable scientific model. The next experiment is:
 
 ```text
-add LLM-generated PVMAPS result explanation
+general-LLM candidate
+vs.
+research-paper/RAG-guided candidate
 ```
 
-This is a good intermediate feature because it improves the user experience without changing the scientific model pipeline.
+Both paths should use the same validation, PVMAPS execution, and result
+reporting interfaces so only the source of the proposed configuration changes.
