@@ -228,6 +228,8 @@ USER_PROFILE_TEXT={
     "user_role_label":"Optional: Describe your role in your own words",
     "solar_experience_label":"How would you describe your experience with solar farm design?",
     "project_goal_label":"What is your objective today?",
+    "site_location_label":"Please enter a site location if you have one",
+    "site_location_placeholder":"Lafayette, Indiana",
     "goal_details_label":"Tell us more about your goal",
     "submit_button":"Submit profile",
 }
