@@ -49,7 +49,7 @@ APP_TITLE = "PVMAPS Solar Yield Demo"
 
 LOCATION_TEXT = {
     "input_label": "Farm Location (City, State)",
-    "geocode_button": "Retrieve coordinates",
+    "geocode_button": "Use this location",
     "geocode_error": "Could not retrieve coordinates.",
     "matched_location_header": "Matched Location",
     "result_location_header": "Location",
@@ -225,13 +225,15 @@ MONTH_LABELS = [
 USER_PROFILE_TEXT={
     "header":"Tell us about yourself and your background to help us tailor the experience.",
     "user_type_label":"Which of these best describes you?",
+    "user_role_label":"Optional: Describe your role in your own words",
     "solar_experience_label":"How would you describe your experience with solar farm design?",
+    "project_goal_label":"What is your objective today?",
+    "goal_details_label":"Tell us more about your goal",
     "submit_button":"Submit profile",
 }
 
 USER_TYPE_OPTIONS = [
-    "Farmer",
-    "Landowner",
+    "Farmer/Landowner",
     "Researcher",
     "Solar developer",
     "Policymaker",
@@ -239,12 +241,20 @@ USER_TYPE_OPTIONS = [
 ]
 
 SOLAR_EXPERIENCE_OPTIONS = [
-    "I am new to solar farm design",
-    "I know basic solar terms but have not worked on a project",
-    "I have evaluated solar options as a landowner, farmer, or decision-maker",
-    "I have technical experience designing or modeling solar systems",
+    "Beginner-I am new to solar farm design.",
+    "Some experience-I know the basics.",
+    "Technical-I understand solar farm design terms.",
+    "Expert-I have technical experience designing or modeling solar systems",
 ]
 
+PROJECT_GOAL_OPTIONS=[
+    "Understand if AgPV is feasible for my land",
+        "Compare solar farm design options",
+        "Estimate solar energy yield",
+        "Learn about agrivoltaics",
+        "Support research or planning",
+        "Other / not sure"
+]
 DATASHEET_UPLOAD_TEXT = {
     "label": "Upload a solar panel datasheet",
     "help": "Optional PDF upload.",
@@ -393,4 +403,50 @@ Rules:
 - Use the provided climate summary as context, if needed.
 - Use "default values" for panel_model unless a specific validated panel model is available.
 - Do not invent unsupported fields.
+"""
+
+LLM_SYSTEM_INTENT_CLASSIFIER_PROMPT = """
+You classify the user's message during a PVMAPS questionnaire.
+
+Return exactly one label and nothing else.
+
+Allowed labels:
+- answer
+- needs_explanation
+- asks_recommendation
+- unknown
+
+Definitions:
+- answer: The user provides a value, choice, number, model name, or says to use defaults.
+- needs_explanation: The user is confused, asks what something means, or says they do not understand.
+- asks_recommendation: The user asks what is best, recommended, optimal, common, or what they should choose.
+- unknown: The message is unrelated, too vague, or cannot be classified.
+
+Rules:
+- If the user asks a question about meaning, classify as needs_explanation.
+- If the user asks what to choose, classify as asks_recommendation.
+- If the user gives a usable answer, classify as answer.
+- If unsure, classify as unknown.
+
+Examples:
+User: "tracking"
+Label: answer
+
+User: "use default"
+Label: answer
+
+User: "what does this mean?"
+Label: needs_explanation
+
+User: "i dont understand"
+Label: needs_explanation
+
+User: "which one is recommended?"
+Label: asks_recommendation
+
+User: "what should I choose?"
+Label: asks_recommendation
+
+User: "hello"
+Label: unknown
 """

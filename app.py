@@ -17,7 +17,8 @@ from constants import (
     USER_PROFILE_TEXT,
     USER_TYPE_OPTIONS,
     SOLAR_EXPERIENCE_OPTIONS,
-    DATASHEET_UPLOAD_TEXT
+    DATASHEET_UPLOAD_TEXT,
+    PROJECT_GOAL_OPTIONS
 )
 from pvmaps.input_builder import create_default_pvmaps_input
 from pvmaps.input_validator import validate_pvmaps_input
@@ -56,7 +57,10 @@ if "coordinates" in st.session_state:
         st.subheader(USER_PROFILE_TEXT["header"])
         with st.form("user_profile_form"):
             user_type = st.selectbox(USER_PROFILE_TEXT["user_type_label"], options=USER_TYPE_OPTIONS)
+            user_role_details=st.text_input(USER_PROFILE_TEXT["user_role_label"])
             solar_experience = st.selectbox(USER_PROFILE_TEXT["solar_experience_label"], options=SOLAR_EXPERIENCE_OPTIONS)
+            project_goal=st.selectbox(USER_PROFILE_TEXT["project_goal_label"],options=PROJECT_GOAL_OPTIONS)
+            goal_details=st.text_area(USER_PROFILE_TEXT["goal_details_label"])
             submit_button=st.form_submit_button(USER_PROFILE_TEXT["submit_button"])
             datasheet=st.file_uploader(DATASHEET_UPLOAD_TEXT["label"], type=["pdf"], help=DATASHEET_UPLOAD_TEXT["help"])
 
@@ -70,7 +74,10 @@ if "coordinates" in st.session_state:
                     }
                 st.session_state["user_profile"] = {
                     "user_type": user_type,
+                    "user_role_details":user_role_details,
                     "solar_experience": solar_experience,
+                    "project_goal":project_goal,
+                    "goal_details":goal_details
                 }
                 st.rerun()
         st.stop()
@@ -180,7 +187,7 @@ if "coordinates" in st.session_state:
 
                         st.rerun()
                     value=extracted_answer["value"]
-                    #print(f"Extracted answer: {value}")
+                    st.write(value)
                     parsed_answer = parse_questionnaire_answer(field,value)
                     update_questionnaire_state(state, field, parsed_answer)
                     st.session_state["questionnaire_state"]=state
