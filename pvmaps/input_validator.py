@@ -44,6 +44,9 @@ def validate_pvmaps_input(data):
 
     if data["array"]["elevation"] < 0:
         errors.append(PVMAPS_VALIDATION_MESSAGES["array_elevation_nonnegative"])
+        
+    if data["array"]["elevation"] <= data["module"]["height"] / 2:
+        errors.append(PVMAPS_VALIDATION_MESSAGES["array_elevation_height_relation"])
     
     if not (PVMAPS_VALIDATION_LIMITS["lat_min"] <= data["lat"] <= PVMAPS_VALIDATION_LIMITS["lat_max"]):
         errors.append(PVMAPS_VALIDATION_MESSAGES["lat_range"])
