@@ -1,9 +1,7 @@
 import json
 
-from constants import (
-    LLM_SYSTEM_CANDIDATE_CONFIG_PROMPT,
-    PVMAPS_FIELD_SCHEMA,
-)
+from constants import PVMAPS_FIELD_SCHEMA
+from llm.prompts import LLM_SYSTEM_CANDIDATE_CONFIG_PROMPT
 from llm.client import call_llm
 
 

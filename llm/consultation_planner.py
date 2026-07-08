@@ -1,6 +1,6 @@
 import json
 
-from constants import LLM_SYSTEM_CONSULTATION_PLANNER_PROMPT
+from llm.prompts import LLM_SYSTEM_CONSULTATION_PLANNER_PROMPT
 from llm.client import call_llm
 
 
@@ -15,9 +15,9 @@ def plan_next_consultation_step(
         {
             "role": "user",
             "content": (
-                f"User profile:\n{user_profile}\n\n"
-                f"Location context:\n{location_context}\n\n"
-                f"Consultation history:\n{consultation_history}\n\n"
+                f"User profile:\n{json.dumps(user_profile, indent=2)}\n\n"
+                f"Location context:\n{json.dumps(location_context, indent=2)}\n\n"
+                f"Consultation history:\n{json.dumps(consultation_history, indent=2)}\n\n"
                 "Plan the next consultation step."
             ),
         },
@@ -41,3 +41,4 @@ def plan_next_consultation_step(
         "reason": plan.get("reason"),
         "ready_for_pvmaps": bool(plan.get("ready_for_pvmaps")),
     }
+

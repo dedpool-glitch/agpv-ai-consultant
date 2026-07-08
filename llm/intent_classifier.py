@@ -1,4 +1,4 @@
-from constants import LLM_SYSTEM_INTENT_CLASSIFIER_PROMPT
+from llm.prompts import LLM_SYSTEM_INTENT_CLASSIFIER_PROMPT
 from llm.client import call_llm
 def classify_intent(field,question,user_response,api_key):
     messages = [

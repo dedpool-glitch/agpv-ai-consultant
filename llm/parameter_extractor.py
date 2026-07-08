@@ -1,6 +1,6 @@
 import json
 from llm.client import call_llm
-from constants import LLM_SYSTEM_EXTRACTION_PROMPT
+from llm.prompts import LLM_SYSTEM_EXTRACTION_PROMPT
 
 def extract_questionnaire_parameter(field,question,user_response,api_key):
     messages=[
@@ -16,3 +16,4 @@ def extract_questionnaire_parameter(field,question,user_response,api_key):
         extracted_json=None
 
     return extracted_json
+
