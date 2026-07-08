@@ -45,7 +45,7 @@ QUESTIONNAIRE_FIELD_LIMITS = {
     "albedo": ("albedo_min", "albedo_max", "albedo_range"),
 }
 
-APP_TITLE = "PVMAPS Solar Yield Demo"
+APP_TITLE = "AgPV AI Consultant"
 
 LOCATION_TEXT = {
     "input_label": "Farm Location (City, State)",
@@ -111,7 +111,7 @@ GENERAL_CHAT_UI_TEXT = {
     "route_question": "Would you like to discuss agrivoltaics first, or move toward a solar-yield estimate?",
     "discuss_button": "Discuss first",
     "estimate_button": "Generate solar estimate",
-    "description": "Ask questions about agrivoltaics, solar design, assumptions, or what this tool can help with.",
+    "description": "Ask about agrivoltaics, solar design, assumptions, or planning tradeoffs. If a solar-yield estimate is useful, I will prepare it in the background.",
     "answer_label": "Ask an AgPV question",
     "start_estimate_button": "Start solar estimate setup",
 }
@@ -128,6 +128,7 @@ PVMAPS_RUN_TEXT = {
 }
 
 RESULT_TEXT = {
+    "latest_estimate_header": "Latest solar-yield estimate",
     "result_header": "Result",
     "monthly_yield_header": "Monthly Yield",
     "chart_x_label": "Month",
@@ -437,7 +438,7 @@ Return only the question text.
 LLM_SYSTEM_CONSULTATION_PLANNER_PROMPT = """
 You are an agrivoltaics consultation planner.
 
-Your job is to decide the next broad, non-technical question to ask before any PVMAPS technical setup begins.
+Your job is to decide the next broad, non-technical consultation step for an agrivoltaics assistant.
 
 Return only raw JSON. Do not use markdown or extra text.
 
@@ -450,20 +451,21 @@ Required JSON format:
 }
 
 Rules:
+- Treat PVMAPS as an optional background tool, not the destination of every conversation.
 - Ask broad AgPV/project questions, not detailed PVMAPS parameter questions.
 - Adapt to the user's role, experience, stated goal, location context, and previous consultation messages.
 - Do not repeat a question if the user has already answered it.
 - If the user gives a partial answer, acknowledge what is already known and ask only for the missing detail.
 - Move the conversation forward after each answer.
 - First identify the known facts from the consultation history, then avoid asking for those facts again.
-- If the user's answer already gives enough context for an initial estimate, set ready_for_pvmaps to true instead of asking another broad question.
+- Set ready_for_pvmaps to true only when the user explicitly asks for a solar-yield estimate, asks for site-specific solar potential, or clearly needs a solar-yield estimate to answer their question.
 - If you ask another question, it must request genuinely new information or a decision, not rephrase a previous question.
 - You may ask about crop/land use, main concern, desired output, practical constraints, learning goals, or whether they want a site-specific estimate.
 - Do not ask for current crop yield, expected crop yield, farm revenue, costs, profit, or payback because those are not modeled by the current PVMAPS-only prototype.
 - If the user is concerned about crop yield or farm operations, acknowledge that concern by asking whether to use conservative solar-layout assumptions or move toward a solar-yield estimate.
 - Do not ask detailed PVMAPS setup questions such as panel tilt, azimuth/orientation, pitch, albedo, array configuration, or panel model. Those belong to the technical setup stage.
-- After roughly 3 to 5 broad consultation turns, either set ready_for_pvmaps to true or ask whether the user wants to continue general discussion.
-- If the user clearly wants a solar-yield estimate or enough project context has been collected, set ready_for_pvmaps to true and question to null.
+- Do not move to PVMAPS just because several turns have passed.
+- If the user clearly wants a solar-yield estimate, set ready_for_pvmaps to true and question to null.
 - If the user is still exploring generally, ask a helpful next question and set ready_for_pvmaps to false.
 - Do not ask more than one question.
 - Be concise and natural.
