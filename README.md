@@ -60,6 +60,10 @@ demos/          isolated command-line pipelines
 tests/          unit and integration tests
 docs/           design and progress documentation
 ```
-### Todo 
-- [ ] Foobar 1
-- [ ] Foobar 2 
+### Updates:
+- revamped UI flow, questions can be asked after PVMAPS too.
+- allowed LLMs to decide on parameter values on their own (with appropriate justification)
+- LLMs can answer AGPV related questions more freely now.
+- PVMAPS can run only once. 
+- refactored main app script
+- made UI changes

@@ -10,3 +10,4 @@ data/panel_specs.json
 outputs/
 papers/
 candidate_history.csv
+redundant.py
