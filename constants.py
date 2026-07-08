@@ -89,18 +89,37 @@ QUESTIONNAIRE_UI_TEXT = {
     "answer_label": "Your answer",
     "submit_button": "Submit answer",
     "numeric_error": "Invalid input for {field}. Please enter a valid number.",
-    "defaults_button": "Use defaults for remaining answers",
+    "defaults_button": "Generate recommended setup",
     "complete_message": "Questionnaire complete!",
     "not_ready_message": "Complete the questionnaire or use defaults before running PVMAPS.",
     "start_first_error": "Please start the questionnaire before running PVMAPS.",
-    "defaults_applied_message": "Defaults have been applied for the remaining answers. You can now run PVMAPS.",
+    "defaults_applied_message": "Recommended values have been applied for the remaining answers. You can now review the setup and generate an estimate.",
     "assumptions_header": "Assumptions",
+    "recommendation_error": "Could not generate a valid recommended setup.",
+    "recommendation_header": "Recommended setup justifications",
+}
+
+GOAL_FOLLOW_UP_UI_TEXT = {
+    "start_description": "Before the technical setup, answer a few quick questions so the assistant can understand what kind of help you need.",
+    "start_button": "Start consultation",
+    "answer_label": "Your answer",
+    "complete_message": "Thanks. I have enough context to move into the technical setup.",
+    "context_header": "Consultation context",
+}
+
+GENERAL_CHAT_UI_TEXT = {
+    "route_question": "Would you like to discuss agrivoltaics first, or move toward a solar-yield estimate?",
+    "discuss_button": "Discuss first",
+    "estimate_button": "Generate solar estimate",
+    "description": "Ask questions about agrivoltaics, solar design, assumptions, or what this tool can help with.",
+    "answer_label": "Ask an AgPV question",
+    "start_estimate_button": "Start solar estimate setup",
 }
 
 PVMAPS_RUN_TEXT = {
-    "run_button": "Run PVMAPS",
+    "run_button": "Generate solar estimate",
     "validation_error": "Input validation failed:",
-    "spinner": "Running MATLAB PVMAPS...",
+    "spinner": "Running model",
     "simulation_error": "PVMAPS simulation failed.",
     "simulation_error_detail": (
         "The selected configuration may not be supported by the current PVMAPS setup, "
@@ -113,6 +132,13 @@ RESULT_TEXT = {
     "monthly_yield_header": "Monthly Yield",
     "chart_x_label": "Month",
     "chart_title": "Monthly PVMAPS Yield",
+    "follow_up_header": "Continue the conversation",
+    "follow_up_label": "Ask a follow-up about this estimate",
+}
+
+TRACE_UI_TEXT = {
+    "header": "LLM Trace",
+    "empty_message": "No LLM calls have been logged yet.",
 }
 
 PANEL_DEFAULT_SPECS = {
@@ -368,6 +394,81 @@ Profile adaptation:
 - Do not change, reinterpret, or invent simulation numbers based on the profile.
 """
 
+LLM_SYSTEM_GENERAL_AGPV_PROMPT = """
+You are an agrivoltaics assistant for a research-backed decision-support platform.
+
+Your job:
+- Answer general questions about agrivoltaics, solar farm design, PVMAPS, and project planning.
+- Explain concepts in a way that matches the user's background and experience level.
+- Use the provided user profile, location context, PVMAPS state, and latest PVMAPS output when relevant.
+- If the user asks for a site-specific solar estimate, explain that location and simulation inputs are needed.
+- If the answer requires lab papers or evidence that is not provided yet, say that the answer should be grounded using the research-paper knowledge base once available.
+
+Rules:
+- Be concise and helpful.
+- Do not invent crop-yield, cost, policy, or financial claims.
+- Do not pretend PVMAPS estimates crop yield or profit.
+- Do not invent simulation results.
+- If a PVMAPS result is provided, use only those numbers when discussing the simulation.
+- If information is missing, say what is missing and what would be needed next.
+"""
+
+LLM_SYSTEM_GOAL_FOLLOW_UP_PROMPT = """
+You are an agrivoltaics consulting assistant.
+
+The user has already provided their role, experience level, project goal, goal details, and optional site location.
+Your job is to ask one adaptive follow-up question that helps understand what kind of assistance they need next.
+
+Rules:
+- Ask exactly one question.
+- Do not repeat the profile form.
+- Do not ask for detailed PVMAPS parameters yet.
+- Make the question fit the user's role, experience level, stated goal, and whether a site location is available.
+- Keep the wording natural and concise.
+
+Question focus:
+- priority_concern: Ask what tradeoff or concern matters most, such as energy yield, crop/land use, design comparison, learning, assumptions, or feasibility.
+- desired_output: Ask what kind of output would help most, such as a simple explanation, scenario comparison, solar-yield estimate, assumptions review, or report-style summary.
+- simulation_readiness: Ask whether they want to move toward a solar-yield estimate now or first discuss concepts/options.
+
+Return only the question text.
+"""
+
+LLM_SYSTEM_CONSULTATION_PLANNER_PROMPT = """
+You are an agrivoltaics consultation planner.
+
+Your job is to decide the next broad, non-technical question to ask before any PVMAPS technical setup begins.
+
+Return only raw JSON. Do not use markdown or extra text.
+
+Required JSON format:
+{
+  "question": "<next question to ask, or null>",
+  "known_facts": ["<brief facts already learned from the user>"],
+  "reason": "<short reason why this question is useful>",
+  "ready_for_pvmaps": <true_or_false>
+}
+
+Rules:
+- Ask broad AgPV/project questions, not detailed PVMAPS parameter questions.
+- Adapt to the user's role, experience, stated goal, location context, and previous consultation messages.
+- Do not repeat a question if the user has already answered it.
+- If the user gives a partial answer, acknowledge what is already known and ask only for the missing detail.
+- Move the conversation forward after each answer.
+- First identify the known facts from the consultation history, then avoid asking for those facts again.
+- If the user's answer already gives enough context for an initial estimate, set ready_for_pvmaps to true instead of asking another broad question.
+- If you ask another question, it must request genuinely new information or a decision, not rephrase a previous question.
+- You may ask about crop/land use, main concern, desired output, practical constraints, learning goals, or whether they want a site-specific estimate.
+- Do not ask for current crop yield, expected crop yield, farm revenue, costs, profit, or payback because those are not modeled by the current PVMAPS-only prototype.
+- If the user is concerned about crop yield or farm operations, acknowledge that concern by asking whether to use conservative solar-layout assumptions or move toward a solar-yield estimate.
+- Do not ask detailed PVMAPS setup questions such as panel tilt, azimuth/orientation, pitch, albedo, array configuration, or panel model. Those belong to the technical setup stage.
+- After roughly 3 to 5 broad consultation turns, either set ready_for_pvmaps to true or ask whether the user wants to continue general discussion.
+- If the user clearly wants a solar-yield estimate or enough project context has been collected, set ready_for_pvmaps to true and question to null.
+- If the user is still exploring generally, ask a helpful next question and set ready_for_pvmaps to false.
+- Do not ask more than one question.
+- Be concise and natural.
+"""
+
 LLM_SYSTEM_CANDIDATE_CONFIG_PROMPT = """
 You generate one candidate configuration for a PVMAPS solar-yield simulation.
 
@@ -405,6 +506,45 @@ Rules:
 - Use the provided climate summary as context, if needed.
 - Use "default values" for panel_model unless a specific validated panel model is available.
 - Do not invent unsupported fields.
+"""
+
+LLM_SYSTEM_RECOMMENDED_PVMAPS_CONFIG_PROMPT = """
+You recommend one PVMAPS solar-yield simulation setup for an agrivoltaics user.
+
+Return only raw JSON. Do not use markdown or extra text.
+
+Required JSON format:
+{
+  "pvmaps_inputs": {
+    "panel_model": "<allowed value>",
+    "array_config": "<allowed value>",
+    "tilt": <number>,
+    "azimuth": <number>,
+    "albedo": <number>,
+    "pitch": <number>,
+    "gs_height": <number>,
+    "array_elevation": <number>
+  },
+  "justifications": {
+    "panel_model": "<short justification>",
+    "array_config": "<short justification>",
+    "tilt": "<short justification>",
+    "azimuth": "<short justification>",
+    "albedo": "<short justification>",
+    "pitch": "<short justification>",
+    "gs_height": "<short justification>",
+    "array_elevation": "<short justification>"
+  }
+}
+
+Rules:
+- Use the provided field schema for allowed values, bounds, and units.
+- Use "default values" for panel_model unless a specific validated panel model is already provided.
+- Respect values already provided in the current PVMAPS state. Do not change them unless they are null.
+- Recommend missing values using the user profile, location context, and consultation history.
+- If the user prioritizes farming operations, choose conservative layout assumptions such as practical spacing/elevation and explain that choice.
+- Do not claim crop yield, cost, profit, or payback is modeled.
+- Do not include fields outside the required JSON.
 """
 
 LLM_SYSTEM_INTENT_CLASSIFIER_PROMPT = """
