@@ -1,6 +1,7 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 
 from constants import (
@@ -13,12 +14,15 @@ from constants import (
     PANEL_DEFAULT_SPECS,
     PVMAPS_RUN_TEXT,
     QUESTIONNAIRE_UI_TEXT,
+    GOAL_FOLLOW_UP_UI_TEXT,
+    GENERAL_CHAT_UI_TEXT,
     RESULT_TEXT,
     USER_PROFILE_TEXT,
     USER_TYPE_OPTIONS,
     SOLAR_EXPERIENCE_OPTIONS,
     DATASHEET_UPLOAD_TEXT,
-    PROJECT_GOAL_OPTIONS
+    PROJECT_GOAL_OPTIONS,
+    TRACE_UI_TEXT
 )
 from pvmaps.input_builder import create_default_pvmaps_input
 from pvmaps.input_validator import validate_pvmaps_input
@@ -30,12 +34,45 @@ from questionnaire.state import apply_questionnaire_defaults, get_next_question,
 from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
 from llm.parameter_extractor import extract_questionnaire_parameter
 from llm.question_generator import generate_question
+from llm.consultation_planner import plan_next_consultation_step
 from llm.output_generator import explain_output
+from llm.intent_classifier import classify_intent
+from llm.general_agpv_answerer import answer_general_agpv_question
+from llm.recommended_pvmaps_config import generate_recommended_pvmaps_config
+from llm.candidate_config_validator import validate_candidate_config
 
 load_dotenv()
 api_key = os.getenv("PURDUE_GENAI_KEY")
 
 st.title(APP_TITLE)
+
+
+def add_llm_trace(stage, input_summary=None, output=None, decision=None):
+    st.session_state.setdefault("llm_trace", [])
+    st.session_state["llm_trace"].append({
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "stage": stage,
+        "input": input_summary,
+        "output": output,
+        "decision": decision,
+    })
+
+
+with st.sidebar.expander(TRACE_UI_TEXT["header"], expanded=False):
+    if not st.session_state.get("llm_trace"):
+        st.write(TRACE_UI_TEXT["empty_message"])
+    else:
+        for index, trace in enumerate(st.session_state["llm_trace"], start=1):
+            st.markdown(f"**{index}. {trace['stage']}** `{trace['time']}`")
+            if trace.get("decision"):
+                st.write("Decision:", trace["decision"])
+            if trace.get("input") is not None:
+                st.write("Input")
+                st.json(trace["input"])
+            if trace.get("output") is not None:
+                st.write("Output")
+                st.json(trace["output"])
+            st.divider()
 
 
 if "user_profile" not in st.session_state:
@@ -45,11 +82,11 @@ if "user_profile" not in st.session_state:
         user_role_details = st.text_input(USER_PROFILE_TEXT["user_role_label"])
         solar_experience = st.selectbox(USER_PROFILE_TEXT["solar_experience_label"], options=SOLAR_EXPERIENCE_OPTIONS)
         project_goal = st.selectbox(USER_PROFILE_TEXT["project_goal_label"], options=PROJECT_GOAL_OPTIONS)
+        goal_details = st.text_area(USER_PROFILE_TEXT["goal_details_label"])
         site_location = st.text_input(
             USER_PROFILE_TEXT["site_location_label"],
             placeholder=USER_PROFILE_TEXT["site_location_placeholder"],
         )
-        goal_details = st.text_area(USER_PROFILE_TEXT["goal_details_label"])
         datasheet = st.file_uploader(DATASHEET_UPLOAD_TEXT["label"], type=["pdf"], help=DATASHEET_UPLOAD_TEXT["help"])
         submit_button = st.form_submit_button(USER_PROFILE_TEXT["submit_button"])
 
@@ -102,6 +139,181 @@ if "datasheet" in st.session_state:
     st.success(DATASHEET_UPLOAD_TEXT["success"])
     st.write(f"{DATASHEET_UPLOAD_TEXT['uploaded_file_label']}: {st.session_state['datasheet']['name']}")
 
+if "goal_follow_up_complete" not in st.session_state:
+    st.session_state["goal_follow_up_complete"] = False
+
+if not st.session_state["goal_follow_up_complete"]:
+    if "goal_follow_up_started" not in st.session_state:
+        st.session_state["goal_follow_up_started"] = False
+
+    if not st.session_state["goal_follow_up_started"]:
+        st.write(GOAL_FOLLOW_UP_UI_TEXT["start_description"])
+
+        if st.button(GOAL_FOLLOW_UP_UI_TEXT["start_button"]):
+            plan = plan_next_consultation_step(
+                api_key,
+                user_profile=st.session_state.get("user_profile"),
+                location_context=location_context,
+                consultation_history=[],
+            )
+            add_llm_trace(
+                "consultation_planner",
+                input_summary={
+                    "user_profile": st.session_state.get("user_profile"),
+                    "location_context": location_context,
+                    "consultation_history": [],
+                },
+                output=plan,
+                decision="ready_for_pvmaps" if plan["ready_for_pvmaps"] else "ask_follow_up",
+            )
+            st.session_state["goal_follow_up_started"] = True
+            st.session_state["consultation_messages"] = []
+            st.session_state["consultation_plan_history"] = [plan]
+
+            if plan["ready_for_pvmaps"]:
+                st.session_state["goal_follow_up_complete"] = True
+                st.session_state["post_consultation_route"] = "pvmaps_setup"
+                st.rerun()
+
+            st.session_state["goal_follow_up_messages"] = [
+                {
+                    "role": "assistant",
+                    "content": plan["question"],
+                }
+            ]
+            st.rerun()
+    else:
+        for message in st.session_state.get("goal_follow_up_messages", []):
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
+
+        answer = st.chat_input(GOAL_FOLLOW_UP_UI_TEXT["answer_label"], key="goal_follow_up_input")
+        if answer:
+            st.session_state["goal_follow_up_messages"].append({
+                "role": "user",
+                "content": answer,
+            })
+            st.session_state.setdefault("consultation_messages", [])
+            st.session_state["consultation_messages"].append({
+                "role": "user",
+                "content": answer,
+            })
+
+            plan = plan_next_consultation_step(
+                api_key,
+                user_profile=st.session_state.get("user_profile"),
+                location_context=location_context,
+                consultation_history=st.session_state["consultation_messages"],
+            )
+            add_llm_trace(
+                "consultation_planner",
+                input_summary={
+                    "user_profile": st.session_state.get("user_profile"),
+                    "location_context": location_context,
+                    "consultation_history": st.session_state["consultation_messages"],
+                },
+                output=plan,
+                decision="ready_for_pvmaps" if plan["ready_for_pvmaps"] else "ask_follow_up",
+            )
+            st.session_state.setdefault("consultation_plan_history", [])
+            st.session_state["consultation_plan_history"].append(plan)
+
+            if plan["ready_for_pvmaps"]:
+                st.session_state["goal_follow_up_complete"] = True
+                st.session_state["post_consultation_route"] = "pvmaps_setup"
+                st.session_state["goal_follow_up_messages"].append({
+                    "role": "assistant",
+                    "content": GOAL_FOLLOW_UP_UI_TEXT["complete_message"],
+                })
+            else:
+                st.session_state["goal_follow_up_messages"].append({
+                    "role": "assistant",
+                    "content": plan["question"],
+                })
+            st.rerun()
+
+    st.stop()
+
+if "consultation_messages" in st.session_state:
+    with st.expander(GOAL_FOLLOW_UP_UI_TEXT["context_header"]):
+        st.json(st.session_state["consultation_messages"])
+
+if "post_consultation_route" not in st.session_state:
+    st.write(GENERAL_CHAT_UI_TEXT["route_question"])
+    if st.button(GENERAL_CHAT_UI_TEXT["discuss_button"]):
+        st.session_state["post_consultation_route"] = "general_chat"
+        add_llm_trace(
+            "post_consultation_route",
+            input_summary={"source": "user_button"},
+            output={"route": "general_chat"},
+            decision="discuss_first",
+        )
+        st.rerun()
+    if st.button(GENERAL_CHAT_UI_TEXT["estimate_button"]):
+        st.session_state["post_consultation_route"] = "pvmaps_setup"
+        add_llm_trace(
+            "post_consultation_route",
+            input_summary={"source": "user_button"},
+            output={"route": "pvmaps_setup"},
+            decision="start_estimate",
+        )
+        st.rerun()
+    st.stop()
+
+if st.session_state["post_consultation_route"] == "general_chat":
+    st.write(GENERAL_CHAT_UI_TEXT["description"])
+
+    if "general_chat_messages" not in st.session_state:
+        st.session_state["general_chat_messages"] = []
+
+    for message in st.session_state["general_chat_messages"]:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+
+    question = st.chat_input(GENERAL_CHAT_UI_TEXT["answer_label"], key="general_agpv_input")
+    if question:
+        answer = answer_general_agpv_question(
+            question,
+            api_key,
+            user_profile=st.session_state.get("user_profile"),
+            location_context=location_context,
+            pvmaps_state=st.session_state.get("questionnaire_state"),
+            latest_pvmaps_output=st.session_state.get("latest_pvmaps_output"),
+            conversation_history=st.session_state["general_chat_messages"],
+        )
+        add_llm_trace(
+            "general_agpv_answerer",
+            input_summary={
+                "question": question,
+                "user_profile": st.session_state.get("user_profile"),
+                "location_context": location_context,
+                "conversation_history": st.session_state["general_chat_messages"],
+            },
+            output={"answer": answer},
+            decision="answered_general_question",
+        )
+        st.session_state["general_chat_messages"].append({
+            "role": "user",
+            "content": question,
+        })
+        st.session_state["general_chat_messages"].append({
+            "role": "assistant",
+            "content": answer,
+        })
+        st.rerun()
+
+    if st.button(GENERAL_CHAT_UI_TEXT["start_estimate_button"]):
+        st.session_state["post_consultation_route"] = "pvmaps_setup"
+        add_llm_trace(
+            "post_consultation_route",
+            input_summary={"source": "user_button"},
+            output={"route": "pvmaps_setup"},
+            decision="start_estimate_from_general_chat",
+        )
+        st.rerun()
+
+    st.stop()
+
 mode = st.radio(INPUT_MODE["label"], options=[INPUT_MODE["questionnaire"], INPUT_MODE["manual"]], index=None)
 
 if mode == INPUT_MODE["manual"]:
@@ -144,6 +356,16 @@ elif mode == INPUT_MODE["questionnaire"]:
             first_question = get_next_question(state)
             field = first_question["field"]
             first_generated_question = generate_question(field, state, api_key, st.session_state.get("user_profile"))
+            add_llm_trace(
+                "pvmaps_question_generator",
+                input_summary={
+                    "field": field,
+                    "state": state,
+                    "user_profile": st.session_state.get("user_profile"),
+                },
+                output={"question": first_generated_question},
+                decision="ask_pvmaps_field",
+            )
             st.session_state["active_field"] = field
             st.session_state["active_question"] = first_generated_question
             st.session_state["questionnaire_state"] = state
@@ -170,7 +392,61 @@ elif mode == INPUT_MODE["questionnaire"]:
             if answer:
                 try:
                     raw_answer = answer
+                    intent = classify_intent(field, question, raw_answer, api_key)
+                    add_llm_trace(
+                        "intent_classifier",
+                        input_summary={
+                            "field": field,
+                            "question": question,
+                            "user_response": raw_answer,
+                        },
+                        output={"intent": intent},
+                        decision="extract_parameter" if intent == "answer" else "answer_general_question",
+                    )
+
+                    if intent != "answer":
+                        assistant_answer = answer_general_agpv_question(
+                            raw_answer,
+                            api_key,
+                            user_profile=st.session_state.get("user_profile"),
+                            location_context=location_context,
+                            pvmaps_state=state,
+                            latest_pvmaps_output=st.session_state.get("latest_pvmaps_output"),
+                            conversation_history=st.session_state.get("chat_messages", []),
+                        )
+                        add_llm_trace(
+                            "general_agpv_answerer",
+                            input_summary={
+                                "question": raw_answer,
+                                "user_profile": st.session_state.get("user_profile"),
+                                "location_context": location_context,
+                                "pvmaps_state": state,
+                                "conversation_history": st.session_state.get("chat_messages", []),
+                            },
+                            output={"answer": assistant_answer},
+                            decision="answered_question_during_pvmaps_setup",
+                        )
+                        st.session_state["chat_messages"].append({
+                            "role": "user",
+                            "content": raw_answer,
+                        })
+                        st.session_state["chat_messages"].append({
+                            "role": "assistant",
+                            "content": assistant_answer,
+                        })
+                        st.rerun()
+
                     extracted_answer = extract_questionnaire_parameter(field, question, raw_answer, api_key)
+                    add_llm_trace(
+                        "pvmaps_parameter_extractor",
+                        input_summary={
+                            "field": field,
+                            "question": question,
+                            "user_response": raw_answer,
+                        },
+                        output=extracted_answer,
+                        decision="parse_and_update_state" if extracted_answer else "ask_again",
+                    )
                     if extracted_answer is None:
                         st.session_state["chat_messages"].append({
                             "role": "user",
@@ -211,6 +487,16 @@ elif mode == INPUT_MODE["questionnaire"]:
                     if next_question:
                         field = next_question["field"]
                         generated_question = generate_question(field, state, api_key, st.session_state.get("user_profile"))
+                        add_llm_trace(
+                            "pvmaps_question_generator",
+                            input_summary={
+                                "field": field,
+                                "state": state,
+                                "user_profile": st.session_state.get("user_profile"),
+                            },
+                            output={"question": generated_question},
+                            decision="ask_next_pvmaps_field",
+                        )
                         st.session_state["active_field"] = field
                         st.session_state["active_question"] = generated_question
                         st.session_state["chat_messages"].append({
@@ -227,8 +513,44 @@ elif mode == INPUT_MODE["questionnaire"]:
                 except ValueError as error:
                     st.error(str(error))
             if st.button(QUESTIONNAIRE_UI_TEXT["defaults_button"]):
-                apply_questionnaire_defaults(state)
+                recommendation = generate_recommended_pvmaps_config(
+                    api_key,
+                    user_profile=st.session_state.get("user_profile"),
+                    location_context=location_context,
+                    consultation_history=st.session_state.get("consultation_messages", []),
+                    current_pvmaps_state=state,
+                )
+                parsed_recommendation, recommendation_errors = validate_candidate_config(recommendation)
+                add_llm_trace(
+                    "recommended_pvmaps_config",
+                    input_summary={
+                        "user_profile": st.session_state.get("user_profile"),
+                        "location_context": location_context,
+                        "consultation_history": st.session_state.get("consultation_messages", []),
+                        "current_pvmaps_state": state,
+                    },
+                    output={
+                        "recommendation": recommendation,
+                        "validation_errors": recommendation_errors,
+                    },
+                    decision="apply_recommendation" if not recommendation_errors else "recommendation_failed",
+                )
+
+                if recommendation_errors:
+                    st.error(QUESTIONNAIRE_UI_TEXT["recommendation_error"])
+                    for error in recommendation_errors:
+                        st.write("-", error)
+                    st.stop()
+
+                justifications = recommendation.get("justifications", {})
+                for field, value in parsed_recommendation.items():
+                    if state.get(field) is None:
+                        update_questionnaire_state(state, field, value, assumed=True)
+                        if field in justifications:
+                            state["assumptions"].append(f"{field}: {justifications[field]}")
+
                 st.session_state["questionnaire_state"] = state
+                st.session_state["recommended_pvmaps_config"] = recommendation
                 st.session_state["questionnaire_ready_to_run"] = True
                 st.session_state["chat_messages"].append({
                     "role": "assistant",
@@ -244,6 +566,9 @@ elif mode == INPUT_MODE["questionnaire"]:
                 st.subheader(QUESTIONNAIRE_UI_TEXT["assumptions_header"])
                 for assumption in assumptions:
                     st.write("-", assumption)
+            if "recommended_pvmaps_config" in st.session_state:
+                st.subheader(QUESTIONNAIRE_UI_TEXT["recommendation_header"])
+                st.json(st.session_state["recommended_pvmaps_config"].get("justifications", {}))
 
 can_run_pvmaps = (
     mode == INPUT_MODE["manual"]
@@ -255,6 +580,41 @@ can_run_pvmaps = (
 
 if mode == INPUT_MODE["questionnaire"] and not st.session_state.get("questionnaire_ready_to_run", False):
     st.write(QUESTIONNAIRE_UI_TEXT["not_ready_message"])
+
+if can_run_pvmaps:
+    st.subheader("Review simulation setup")
+
+    if mode == INPUT_MODE["manual"]:
+        review_data = {
+            "location": address,
+            "latitude": lat,
+            "longitude": lon,
+            "panel_model": panel_model,
+            "array_config": config,
+            "tilt": tilt,
+            "azimuth": azimuth,
+            "albedo": albedo,
+            "pitch": pitch,
+            "ground_sculpting_height": gsHeight,
+            "array_elevation": elevation,
+        }
+    else:
+        questionnaire_state = st.session_state["questionnaire_state"]
+        review_data = {
+            "location": address,
+            "latitude": lat,
+            "longitude": lon,
+            "panel_model": questionnaire_state["panel_model"],
+            "array_config": questionnaire_state["array_config"],
+            "tilt": questionnaire_state["tilt"],
+            "azimuth": questionnaire_state["azimuth"],
+            "albedo": questionnaire_state["albedo"],
+            "pitch": questionnaire_state["pitch"],
+            "ground_sculpting_height": questionnaire_state["gs_height"],
+            "array_elevation": questionnaire_state["array_elevation"],
+        }
+
+    st.json(review_data)
 
 if can_run_pvmaps and st.button(PVMAPS_RUN_TEXT["run_button"]):
     if mode == INPUT_MODE["manual"]:
@@ -294,24 +654,91 @@ if can_run_pvmaps and st.button(PVMAPS_RUN_TEXT["run_button"]):
                     pvmaps_input,
                     r"D:/agpv-ai-consultant/PV-MAPS-main"
                 )
+                st.session_state["latest_pvmaps_input"] = pvmaps_input
+                st.session_state["latest_pvmaps_output"] = output
+                st.session_state["latest_pvmaps_explanation"] = explain_output(
+                    output,
+                    api_key,
+                    st.session_state.get("user_profile"),
+                )
+                add_llm_trace(
+                    "pvmaps_output_explainer",
+                    input_summary={
+                        "pvmaps_output": output,
+                        "user_profile": st.session_state.get("user_profile"),
+                    },
+                    output={"explanation": st.session_state["latest_pvmaps_explanation"]},
+                    decision="explain_latest_estimate",
+                )
+                st.session_state.setdefault("post_result_messages", [])
         except Exception as error:
             st.error(PVMAPS_RUN_TEXT["simulation_error"])
             st.write(PVMAPS_RUN_TEXT["simulation_error_detail"])
             st.code(str(error))
             st.stop()
 
-        st.subheader(LOCATION_TEXT["result_location_header"])
-        st.write(address)
+if "latest_pvmaps_output" in st.session_state:
+    latest_output = st.session_state["latest_pvmaps_output"]
 
-        st.subheader(RESULT_TEXT["result_header"])
-        st.write(explain_output(output, api_key, st.session_state.get("user_profile")))
+    st.subheader(LOCATION_TEXT["result_location_header"])
+    st.write(address)
 
-        st.subheader(RESULT_TEXT["monthly_yield_header"])
+    st.subheader(RESULT_TEXT["result_header"])
+    st.write(st.session_state.get("latest_pvmaps_explanation"))
 
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.bar(MONTH_LABELS, output["monthly_yield"])
-        ax.set_xlabel(RESULT_TEXT["chart_x_label"])
-        ax.set_ylabel(f"Yield ({output['yield_unit']})")
-        ax.set_title(RESULT_TEXT["chart_title"])
-        ax.tick_params(axis="x", labelrotation=45)
-        st.pyplot(fig)
+    st.subheader(RESULT_TEXT["monthly_yield_header"])
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(MONTH_LABELS, latest_output["monthly_yield"])
+    ax.set_xlabel(RESULT_TEXT["chart_x_label"])
+    ax.set_ylabel(f"Yield ({latest_output['yield_unit']})")
+    ax.set_title(RESULT_TEXT["chart_title"])
+    ax.tick_params(axis="x", labelrotation=45)
+    st.pyplot(fig)
+
+    st.subheader(RESULT_TEXT["follow_up_header"])
+
+    if "post_result_messages" not in st.session_state:
+        st.session_state["post_result_messages"] = []
+
+    for message in st.session_state["post_result_messages"]:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+
+    follow_up = st.chat_input(RESULT_TEXT["follow_up_label"], key="post_result_input")
+    if follow_up:
+        full_conversation_history = {
+            "consultation_messages": st.session_state.get("consultation_messages", []),
+            "questionnaire_messages": st.session_state.get("chat_messages", []),
+            "post_result_messages": st.session_state.get("post_result_messages", []),
+        }
+        answer = answer_general_agpv_question(
+            follow_up,
+            api_key,
+            user_profile=st.session_state.get("user_profile"),
+            location_context=location_context,
+            pvmaps_state=st.session_state.get("questionnaire_state"),
+            latest_pvmaps_output=latest_output,
+            conversation_history=full_conversation_history,
+        )
+        add_llm_trace(
+            "post_result_answerer",
+            input_summary={
+                "question": follow_up,
+                "user_profile": st.session_state.get("user_profile"),
+                "location_context": location_context,
+                "latest_pvmaps_output": latest_output,
+                "conversation_history": full_conversation_history,
+            },
+            output={"answer": answer},
+            decision="answered_follow_up_after_estimate",
+        )
+        st.session_state["post_result_messages"].append({
+            "role": "user",
+            "content": follow_up,
+        })
+        st.session_state["post_result_messages"].append({
+            "role": "assistant",
+            "content": answer,
+        })
+        st.rerun()
