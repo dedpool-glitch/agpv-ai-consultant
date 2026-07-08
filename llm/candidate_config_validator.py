@@ -7,6 +7,9 @@ def validate_candidate_config(candidate):
     if candidate is None:
         return None, ["LLM did not return valid JSON."]
 
+    if candidate.get("_parse_error"):
+        return None, [candidate["_parse_error"]]
+
     if "pvmaps_inputs" not in candidate:
         return None, ["Candidate is missing pvmaps_inputs."]
 
