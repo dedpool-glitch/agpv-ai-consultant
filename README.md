@@ -112,3 +112,11 @@ Use Git LFS or a shared lab storage location for large files when needed.
 This is an active research prototype. The main development goal is to turn
 PVMAPS into one background tool within a broader AgPV assistant, rather than
 making the conversation end after one simulation.
+
+## Development Targets
+
+- Add RAG support using CEED AgPV papers.
+- Deploy the prototype for lab access, preferably through Purdue RCAC or a lab
+  server.
+- Extend the backend so the app can run and compare multiple PVMAPS
+  simulations during one consultation.
