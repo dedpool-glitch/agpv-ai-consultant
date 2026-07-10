@@ -214,6 +214,7 @@ if not st.session_state["goal_follow_up_complete"]:
                     "role": "assistant",
                     "content": "Thanks. I have enough context to prepare a solar-yield estimate in the background.",
                 })
+                st.session_state["general_chat_messages"] = list(st.session_state["goal_follow_up_messages"])
                 try:
                     run_recommended_pvmaps_estimate(st.session_state, api_key, location_context)
                 except Exception as error:
@@ -266,25 +267,27 @@ if st.session_state["post_consultation_route"] == "general_chat":
     if GENERAL_CHAT_UI_TEXT["description"]:
         st.write(GENERAL_CHAT_UI_TEXT["description"])
 
-    if "latest_pvmaps_output" in st.session_state:
-        latest_output = st.session_state["latest_pvmaps_output"]
-        with st.expander(RESULT_TEXT["latest_estimate_header"], expanded=False):
-            st.subheader(LOCATION_TEXT["result_location_header"])
-            st.write(address or "No confirmed site location")
-
-            st.subheader(RESULT_TEXT["monthly_yield_header"])
-            fig, ax = plt.subplots(figsize=(10, 5))
-            ax.bar(MONTH_LABELS, latest_output["monthly_yield"])
-            ax.set_xlabel(RESULT_TEXT["chart_x_label"])
-            ax.set_ylabel(f"Yield ({latest_output['yield_unit']})")
-            ax.set_title(RESULT_TEXT["chart_title"])
-            ax.tick_params(axis="x", labelrotation=45)
-            st.pyplot(fig)
-
     if "general_chat_messages" not in st.session_state:
         st.session_state["general_chat_messages"] = list(st.session_state.get("goal_follow_up_messages", []))
 
     for message in st.session_state["general_chat_messages"]:
+        if message.get("type") == "latest_estimate":
+            latest_output = st.session_state.get("latest_pvmaps_output")
+            if latest_output:
+                with st.expander(RESULT_TEXT["latest_estimate_header"], expanded=True):
+                    st.subheader(LOCATION_TEXT["result_location_header"])
+                    st.write(address or "No confirmed site location")
+
+                    st.subheader(RESULT_TEXT["monthly_yield_header"])
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    ax.bar(MONTH_LABELS, latest_output["monthly_yield"])
+                    ax.set_xlabel(RESULT_TEXT["chart_x_label"])
+                    ax.set_ylabel(f"Yield ({latest_output['yield_unit']})")
+                    ax.set_title(RESULT_TEXT["chart_title"])
+                    ax.tick_params(axis="x", labelrotation=45)
+                    st.pyplot(fig)
+            continue
+
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
