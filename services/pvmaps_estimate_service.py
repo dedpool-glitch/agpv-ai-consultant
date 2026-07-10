@@ -101,6 +101,10 @@ def run_recommended_pvmaps_estimate(session_state, api_key, location_context):
     session_state.setdefault("post_result_messages", [])
     session_state["general_chat_messages"].append({
         "role": "assistant",
+        "type": "latest_estimate",
+    })
+    session_state["general_chat_messages"].append({
+        "role": "assistant",
         "content": explanation,
     })
     add_llm_trace(
