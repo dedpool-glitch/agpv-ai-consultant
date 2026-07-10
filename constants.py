@@ -259,7 +259,7 @@ USER_PROFILE_TEXT={
     "site_location_label":"Please enter a site location if you have one",
     "site_location_placeholder":"Lafayette, Indiana",
     "goal_details_label":"Tell us more about your goal",
-    "submit_button":"Submit profile",
+    "submit_button":"Upload profile",
 }
 
 USER_TYPE_OPTIONS = [
