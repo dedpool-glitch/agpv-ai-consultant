@@ -11,3 +11,5 @@ outputs/
 papers/
 candidate_history.csv
 redundant.py
+resources/
+data/chroma_db/
