@@ -1,212 +1,141 @@
 # Project Goals
 
-This document captures the project goals and engineering requirements discussed so far for the PVMAPS-focused AgPV AI consultant demo.
+This document captures the current goals and engineering requirements for the
+AgPV Assistant prototype.
 
 ## Current Scope
 
-The current system is a PVMAPS solar-yield demo. It should collect or infer the inputs needed by PVMAPS, validate them, run the MATLAB PVMAPS simulator, and show the output in a farmer-readable interface.
+The system should support a natural AgPV planning conversation. The assistant
+should be able to answer research-backed questions from CEED papers, run
+PVMAPS when a solar-yield estimate is useful, and continue the conversation
+after model output is available.
 
-The current focus is not full agrivoltaic decision support yet. Crop-yield
-modeling, true optimization, report generation, maps, and RAG over research
-papers are future extensions.
+The key product shift is:
 
-The current experimental goal is to establish a reproducible baseline in which
-a general LLM proposes a PVMAPS configuration from location and climate
-context. This will later be compared with a research-paper/RAG-guided proposal.
+```text
+old framing: conversation -> eventually run PVMAPS
+new framing: conversation -> choose the right tool when needed
+```
+
+PVMAPS is the first scientific backend model. RAG over CEED papers is the first
+knowledge-grounding tool.
 
 ## Mandatory Requirements
 
-### User Input Flow
+### User Flow
 
-- The user must be able to enter a farm location in natural language.
-- The app must convert the location into latitude and longitude using the geocoder.
-- The matched address must be displayed separately from the coordinates.
-- The app should collect a small user profile so explanations can be adjusted to the user's background.
-- The app should allow optional solar panel datasheet upload.
-- The user must choose an input mode before running PVMAPS.
-- The app must support manual input mode.
-- The app must support guided questionnaire mode.
+- The user must be able to provide a profile/background.
+- The user may provide a site location when site-specific analysis is needed.
+- The app should support open-ended AgPV conversation.
+- The app should not force every conversation toward PVMAPS.
+- The user should be able to ask follow-up questions after a model result.
 
-### PVMAPS Input Coverage
+### Routing
 
-The system must collect or fill these PVMAPS inputs:
+- The app should include a routing step before deciding how to answer a user
+  message.
+- The first router version may be simple and should distinguish:
+  - paper/RAG questions
+  - existing PVMAPS/general flow
+- The router should be visible in the LLM trace or other debug output.
+- RAG should not be called for every message.
 
-- `module.cell_tech`
-- `module.height`
-- `module.stc_eff.direct`
-- `module.stc_eff.diffuse`
-- `module.tcoeff`
-- `array.config`
-- `array.tilt`
-- `array.azimuth`
-- `array.albedo`
-- `array.pitch`
-- `array.gsHeight`
-- `array.elevation`
-- `lat`
-- `lon`
+### RAG
 
-### Panel Specs
+- CEED papers should be loaded from a local resource folder.
+- PDFs should be parsed with Docling.
+- Chunks should preserve useful metadata such as title, page, source, and
+  headings.
+- Chunks should be stored in ChromaDB.
+- RAG answers should use retrieved excerpts only.
+- RAG answers should include source metadata when possible.
+- Local PDFs and Chroma DB files should not be committed.
 
-- Panel model information must come from structured stored specs when available.
-- If the user does not know the panel model, the system may use explicit default panel specs.
-- Defaults must not be hidden from the user.
-- Datasheet-derived panel specs should be stored in `panel_specs.json`.
-- Uploaded datasheets should be stored first, then parsed/extracted in a later step.
-- For now, direct and diffuse efficiency can both use the datasheet module efficiency, based on Jabir's guidance.
-- For now, `AL_BSF` can be used as the default cell technology, based on Jabir's guidance.
+### PVMAPS
 
-### Questionnaire Behavior
-
-- The questionnaire must collect one missing field at a time.
-- The questionnaire must track state across Streamlit reruns using `st.session_state`.
-- The app must not run PVMAPS from questionnaire mode until either all required fields are answered or the user explicitly applies defaults.
-- The user must be able to use defaults for remaining unanswered fields.
-- Any defaulted fields must be shown as assumptions.
-
-### Validation
-
-- Individual questionnaire answers must be validated before being stored.
-- Numeric questionnaire answers must be parsed into numbers before entering state.
-- Invalid answers like `.` must not be accepted for fields such as `array_config`.
-- The final PVMAPS input dictionary must still be validated before MATLAB runs.
-- Validation constants and messages should come from shared constants where possible.
-- The questionnaire parser should catch single-answer errors before questionnaire state is updated.
-
-### Current Validation Rules
-
-- `array.config` must be one of `fixed`, `tracking`, or `GSVBF`.
-- `tilt` must be between 0 and 90 degrees.
-- `azimuth` is currently restricted to 90 or 180 for this demo.
-- `albedo` must be between 0 and 1.
-- `pitch` must be positive.
-- `gsHeight` must be non-negative.
-- `array.elevation` must be non-negative.
-- Latitude must be between -90 and 90.
-- Longitude must be between -180 and 180.
-
-### MATLAB / PVMAPS Integration
-
-- The app must call PVMAPS through MATLAB Engine.
-- The PVMAPS path must point to the local `PV-MAPS-main` folder.
-- The runner must add required PVMAPS folders to the MATLAB path before simulation.
+- The app must validate PVMAPS inputs before MATLAB runs.
+- The LLM must not bypass deterministic validation.
 - PVMAPS output must be converted into a Python-readable structure.
+- PVMAPS output explanations must use validated model outputs and explicit
+  assumptions.
+- PVMAPS should be treated as one backend tool, not the only purpose of the
+  application.
 
-### Output Display
+### LLM Safety
 
-- The app must display the matched location.
-- The app must display a natural-language result summary.
-- The app must display monthly yield values in a readable chart.
-- Month labels should be readable.
-- Future LLM-generated summaries must be based only on validated model outputs and explicit assumptions.
-
-### Experimental Candidate Generation
-
-- The system may ask the LLM to propose one complete candidate configuration.
-- The candidate must use the shared PVMAPS field schema.
-- The candidate must include a concise justification for every selected field.
-- Every proposed value must pass the questionnaire parser.
-- The complete PVMAPS input must pass final validation.
-- Location must come from the geocoder, not an invented LLM coordinate.
-- Climate context must come from the NASA lookup service.
-- Accepted candidates must be appended to a CSV run history.
-- The stored record must include location, coordinates, values, and justifications.
+- The LLM should not invent scientific values, citations, or simulation output.
+- The LLM may phrase questions, rewrite queries, route requests, and explain
+  validated outputs.
+- The backend should own validation, defaults, state, and model execution.
+- RAG answers must say when the retrieved sources do not answer the question.
 
 ## Advisory Requirements
 
 ### Code Organization
 
-- Keep static values, labels, defaults, options, and messages in `constants.py`.
-- Keep PVMAPS-related logic in `pvmaps/`.
-- Keep questionnaire state, parsing, and conversion logic in `questionnaire/`.
-- Keep LLM API/client and extraction logic in `llm/`.
-- Keep helper services such as geocoding and panel specs lookup in `services/`.
-- Keep NASA climate lookup and candidate reporting in `services/`.
+- Keep static labels, options, and validation messages in `constants.py`.
+- Keep LLM prompts in `llm/prompts.py`.
+- Keep RAG document loading, chunking, retrieval, and answering in `rag/`.
+- Keep model-specific code in model packages such as `pvmaps/`.
+- Keep app orchestration thin and avoid putting tool logic directly in
+  `app.py`.
 - Keep demo scripts in `demos/`.
-- Avoid placing too much logic inside `app.py`.
 
-### Engineering Principles
+### RAG Evaluation
 
-- Prefer one source of truth for validation ranges and messages.
-- Keep validation layered:
-  - questionnaire answer validation first
-  - final full-input validation before MATLAB
-- Keep default assumptions explicit.
-- Keep functions small and explainable.
-- Keep docs updated as the project changes.
-- Commit stable checkpoints after testing.
+- Use a small set of profile-specific questions to evaluate answer quality.
+- Save demo answers and sources to CSV for meeting review.
+- Check whether retrieved chunks actually support the answer.
+- Add query rewriting only if natural user questions retrieve weak results.
 
-### Testing
+### Future Simulation Design
 
-- Start testing pure backend functions before Streamlit or MATLAB.
-- Use `pytest` for unit tests.
-- Prioritize tests for `questionnaire_parser.py`, `questionnaire_state.py`, and `pvmaps_input_validator.py`.
-- Test both valid and invalid values.
-- Avoid MATLAB-dependent tests until the smaller functions are stable.
-- Mark live API tests as `integration` so normal tests do not depend on the Purdue GenAI API.
-
-### LLM Safety Principle
-
-- The LLM should not invent simulation values silently.
-- LLM-generated candidate values must be labeled as proposals.
-- The LLM should not directly run MATLAB.
-- The LLM should not decide whether a value is valid.
-- The controlled backend should own validation, defaults, state, and PVMAPS execution.
-- The LLM may help make questions more conversational, but code should still decide which required field is being requested.
-- The LLM may explain final outputs, but it must not change model-produced numbers.
-- The user profile may change explanation style, but it must not change model inputs or outputs.
-- LLM justifications must not be presented as verified sources or hidden reasoning.
+- Store model outputs as a list of simulation runs, not only as one latest
+  result.
+- Support multiple PVMAPS scenarios in one consultation.
+- Keep quick ML solar-yield estimates as a separate model/tool from PVMAPS.
 
 ## Future Requirements
 
-### LLM Intake
+### Multiple Knowledge Bases
 
-- Use the LLM for extraction and question phrasing, not simulation.
-- The LLM should convert messy user language into structured field-value pairs.
-- The LLM should phrase required-field questions in simple, nontechnical language.
-- Extracted values must still pass through the questionnaire parser and validators.
-- The backend must remain responsible for state, validation, defaults, and PVMAPS execution.
+Books, lecture pages, and video transcripts should not be mixed blindly into
+the CEED paper collection. They should be added as separate collections.
 
-Example:
+Possible collections:
 
-```json
-{
-  "pitch": 10,
-  "azimuth": 90
-}
+```text
+ceed_papers
+solar_books
+lecture_pages
+video_transcripts
+```
+
+Later routing can choose the correct collection based on user intent.
+
+### Multiple Models
+
+Future model tools may include:
+
+```text
+PVMAPS detailed solar-yield simulation
+quick ML solar-yield estimator
+SIMPLE crop-yield model
+scenario comparison tools
 ```
 
 ### Datasheet Extraction
 
-- Allow users to upload or reference a solar panel datasheet.
-- Store uploaded PDF metadata/content before attempting extraction.
-- Use an LLM or parser to extract panel specs from the datasheet.
-- Store extracted specs in a structured dictionary before using them.
+- Allow users to upload a solar panel datasheet.
+- Extract panel specs into a structured dictionary.
 - Validate extracted specs before using them in PVMAPS.
-
-### Researcher Input Needed
-
-- Ask researchers which input combinations are invalid or unsupported.
-- Ask researchers which array configurations are realistic for different goals.
-- Ask researchers what defaults are scientifically acceptable.
-- Ask researchers how to handle panel orientation and module height consistently.
-
-### Later Extensions
-
-- RAG over project documents and research papers.
-- Goal-based configuration suggestions.
-- RAG-guided configuration generation using the research group's papers.
-- Side-by-side simulation comparison of general-LLM and RAG candidates.
-- Crop-yield model integration.
-- Additional model modules such as SIMPLE.
-- Map visualization.
-- PDF report generation.
+- Store extracted specs separately from the original upload.
 
 ## Current Non-Goals
 
-- The app does not yet optimize solar farm configuration.
-- Candidate generation is not equivalent to scientific optimization.
+- The app does not yet optimize a complete AgPV design.
 - The app does not yet predict crop yield.
-- The app does not yet use RAG.
-- The app does not yet use a full LLM agent.
-- The app does not yet handle all possible real-world solar design constraints.
+- The app does not yet perform economic analysis.
+- The app does not yet route across books, lectures, and papers.
+- The app does not yet support multiple PVMAPS runs in one conversation.
+- The app does not yet integrate the quick ML solar-yield model.

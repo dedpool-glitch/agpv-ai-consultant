@@ -13,13 +13,14 @@ The current prototype supports:
 - A user-facing AgPV consultation flow.
 - Location-aware solar-yield estimation.
 - LLM-assisted discussion of AgPV planning tradeoffs.
+- RAG pipeline for CEED paper retrieval and paper-grounded answers.
 - Background PVMAPS simulation when a solar-yield estimate is useful.
 - Deterministic validation before MATLAB/PVMAPS is called.
 - Simple result visualization and explanation.
 
-The prototype currently focuses on solar-yield estimation. Crop-yield modeling,
-economic analysis, RAG over CEED papers, and multi-model decision support are
-planned future extensions.
+The prototype currently combines solar-yield estimation with an early CEED
+paper RAG pipeline. Crop-yield modeling, economic analysis, multi-run
+simulation comparison, and multi-model decision support are planned extensions.
 
 ## Current Application Flow
 
@@ -57,6 +58,7 @@ services/       geocoding, panel specs, NASA lookup, reporting, and app services
 demos/          isolated command-line demo pipelines
 tests/          unit and integration tests
 docs/           design notes, progress notes, and project documentation
+rag/            document loading, chunking, Chroma retrieval, and RAG answering
 ```
 
 ## Setup
@@ -115,8 +117,12 @@ making the conversation end after one simulation.
 
 ## Development Targets
 
-- Add RAG support using CEED AgPV papers.
+- Integrate the CEED paper RAG pipeline into the app through a routing step, so
+  RAG is used only for research/background questions.
+- Refactor the chat flow so PVMAPS is one optional tool, not the required end
+  point of every conversation.
+- Extend the backend so the app can run and compare multiple PVMAPS simulations
+  during one consultation.
+- Prepare for a quick solar-yield ML model as a second estimate tool.
 - Deploy the prototype for lab access, preferably through Purdue RCAC or a lab
   server.
-- Extend the backend so the app can run and compare multiple PVMAPS
-  simulations during one consultation.

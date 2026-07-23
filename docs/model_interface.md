@@ -4,7 +4,10 @@
 
 This document defines how simulation models should connect to the AgPV AI consultant.
 
-The project currently supports PVMAPS, but the long-term goal is to support additional models such as SIMPLE for crop yield. The code should therefore treat PVMAPS as the first model module, not as the only possible model.
+The project currently supports PVMAPS, but the long-term goal is to support
+additional models such as a quick ML solar-yield estimator and SIMPLE for crop
+yield. The code should therefore treat PVMAPS as the first model module, not as
+the only possible model.
 
 ## Core Idea
 
@@ -24,6 +27,16 @@ The LLM may help collect inputs and explain outputs, but it should not invent mo
 The experimental candidate-generation flow allows the LLM to propose inputs,
 but every proposed value must still pass the same deterministic validators
 before it can reach a simulation model.
+
+The broader assistant should use a router-style flow:
+
+```text
+user message
+-> route to RAG, PVMAPS, quick ML estimate, latest-result explanation, or general answer
+-> call the selected tool
+-> store structured output
+-> continue the conversation
+```
 
 ## Current PVMAPS Interface
 
@@ -61,6 +74,28 @@ location
 ```
 
 The candidate is a baseline proposal, not a proven optimized configuration.
+
+## Simulation Run Storage
+
+The current app often treats PVMAPS output as the latest estimate. To support
+multiple PVMAPS runs and future ML estimates, model outputs should eventually
+be stored as a list of runs:
+
+```python
+st.session_state["simulation_runs"] = [
+    {
+        "run_id": "run_001",
+        "model": "PVMAPS",
+        "scenario_name": "farming-friendly",
+        "inputs": {...},
+        "outputs": {...},
+        "explanation": "...",
+    }
+]
+```
+
+This makes it easier to compare scenarios such as farming-friendly, balanced,
+and solar-yield-focused configurations.
 
 ## Recommended Pattern For Future Models
 
@@ -204,15 +239,41 @@ But the overall app architecture can stay similar:
 conversation -> structured state -> model input -> model output -> explanation
 ```
 
-## Current Design Decision
+## Future Quick ML Solar-Yield Estimator
 
-PVMAPS remains the first stable scientific model. The next experiment is:
+The lab may provide an ML model that gives faster solar-yield estimates from
+location-based inputs. This should be integrated as a separate model/tool, not
+as a replacement for PVMAPS.
+
+Likely role:
 
 ```text
-general-LLM candidate
-vs.
-research-paper/RAG-guided candidate
+quick screening / approximate estimate -> ML model
+detailed configuration simulation -> PVMAPS
 ```
 
-Both paths should use the same validation, PVMAPS execution, and result
-reporting interfaces so only the source of the proposed configuration changes.
+The ML model should still expose:
+
+```text
+input builder
+input validator
+runner
+output normalizer
+result explainer
+```
+
+## Current Design Decision
+
+PVMAPS remains the first stable scientific model. The current architecture goal
+is:
+
+```text
+conversation router
+-> optional CEED paper RAG
+-> optional PVMAPS run
+-> optional future ML quick estimate
+-> continued conversation
+```
+
+All model paths should use controlled validation, structured outputs, and
+traceable explanations.
