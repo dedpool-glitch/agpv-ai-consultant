@@ -64,7 +64,133 @@ RAG_DEMO_CASES = [
             "solar_experience": "Technical-I understand solar farm design terms.",
             "project_goal": "Compare solar farm design options",
         },
-        "question": "How does ground albedo affect bifacial solar farm performance?",
+        "question": "Who will be the next US President?",
+    },
+    {
+        "case_id": "farmer_crop_shading_misconception",
+        "user_profile": {
+            "user_type": "Farmer/Landowner",
+            "solar_experience": "Beginner-I am new to solar farm design.",
+            "project_goal": "Understand if AgPV is feasible for my land",
+        },
+        "question": "Will solar panels shade my crops too much to grow anything?",
+    },
+    {
+        "case_id": "farmer_water_use_claim",
+        "user_profile": {
+            "user_type": "Farmer/Landowner",
+            "solar_experience": "Some experience-I know the basics.",
+            "project_goal": "Learn about agrivoltaics",
+        },
+        "question": "Does having panels over my crops mean I need to water them less?",
+    },
+    {
+        "case_id": "farmer_gsvbf_definition",
+        "user_profile": {
+            "user_type": "Farmer/Landowner",
+            "solar_experience": "Technical-I understand solar farm design terms.",
+            "project_goal": "Compare solar farm design options",
+        },
+        "question": "Is ground-sculpted vertical bifacial (GSVBF) actually different from regular vertical bifacial, or just marketing?",
+    },
+    {
+        "case_id": "developer_tracking_vs_fixed_tilt",
+        "user_profile": {
+            "user_type": "Solar developer",
+            "solar_experience": "Technical-I understand solar farm design terms.",
+            "project_goal": "Compare solar farm design options",
+        },
+        "question": "What's the tradeoff between single-axis tracking and fixed-tilt bifacial in cost and yield?",
+    },
+    {
+        "case_id": "developer_soiling_loss",
+        "user_profile": {
+            "user_type": "Solar developer",
+            "solar_experience": "Expert-I have technical experience designing or modeling solar systems",
+            "project_goal": "Estimate solar energy yield",
+        },
+        "question": "How does soiling loss specifically affect vertical bifacial performance vs. tilted monofacial?",
+    },
+    {
+        "case_id": "developer_latitude_crossover",
+        "user_profile": {
+            "user_type": "Solar developer",
+            "solar_experience": "Expert-I have technical experience designing or modeling solar systems",
+            "project_goal": "Compare solar farm design options",
+        },
+        "question": "At what latitude does tilted monofacial start to outperform vertical bifacial?",
+    },
+    {
+        "case_id": "researcher_ml_prediction",
+        "user_profile": {
+            "user_type": "Researcher",
+            "solar_experience": "Expert-I have technical experience designing or modeling solar systems",
+            "project_goal": "Support research or planning",
+        },
+        "question": "What machine learning approaches have been used to predict solar farm performance at scale?",
+    },
+    {
+        "case_id": "researcher_perovskite_tandem_economics",
+        "user_profile": {
+            "user_type": "Researcher",
+            "solar_experience": "Technical-I understand solar farm design terms.",
+            "project_goal": "Compare solar farm design options",
+        },
+        "question": "How do perovskite-silicon tandem cells change the economics of utility-scale bifacial farms?",
+    },
+    {
+        "case_id": "researcher_experimental_validation",
+        "user_profile": {
+            "user_type": "Researcher",
+            "solar_experience": "Expert-I have technical experience designing or modeling solar systems",
+            "project_goal": "Support research or planning",
+        },
+        "question": "What experimental setups have been used to validate bifacial yield models against real-world data?",
+    },
+    {
+        "case_id": "researcher_beginner_simple_explanation",
+        "user_profile": {
+            "user_type": "Researcher",
+            "solar_experience": "Beginner-I am new to solar farm design.",
+            "project_goal": "Learn about agrivoltaics",
+        },
+        "question": "What's the simplest explanation of why vertical panels can outperform tilted ones?",
+    },
+    {
+        "case_id": "policymaker_adoption_barriers",
+        "user_profile": {
+            "user_type": "Policymaker",
+            "solar_experience": "Beginner-I am new to solar farm design.",
+            "project_goal": "Learn about agrivoltaics",
+        },
+        "question": "What are the main barriers to wider agrivoltaics adoption?",
+    },
+    {
+        "case_id": "policymaker_food_security",
+        "user_profile": {
+            "user_type": "Policymaker",
+            "solar_experience": "Some experience-I know the basics.",
+            "project_goal": "Support research or planning",
+        },
+        "question": "Is there evidence agrivoltaics affects local food security?",
+    },
+    {
+        "case_id": "policymaker_crop_yield_guardrail",
+        "user_profile": {
+            "user_type": "Policymaker",
+            "solar_experience": "Technical-I understand solar farm design terms.",
+            "project_goal": "Estimate solar energy yield",
+        },
+        "question": "What crop yield tradeoffs should I expect if I approve agrivoltaics instead of open-field solar?",
+    },
+    {
+        "case_id": "farmer_cost_savings_guardrail",
+        "user_profile": {
+            "user_type": "Farmer/Landowner",
+            "solar_experience": "Some experience-I know the basics.",
+            "project_goal": "Estimate solar energy yield",
+        },
+        "question": "Can you tell me exactly how much money I'd save switching to vertical bifacial panels?",
     },
 ]
 
@@ -90,7 +216,7 @@ def run_demo_cases(api_key):
             collection_name=COLLECTION_NAME,
             question=demo_case["question"],
             api_key=api_key,
-            n_results=5,
+            n_results=3,
             user_profile=demo_case["user_profile"],
         )
 
