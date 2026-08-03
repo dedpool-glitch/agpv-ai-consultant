@@ -23,7 +23,7 @@ def run_recommended_pvmaps_estimate(session_state, api_key, location_context):
 
     state = session_state.get("questionnaire_state") or initialize_questionnaire_state()
     consultation_history = {
-        "consultation_messages": session_state.get("consultation_messages", []),
+        "consultation_llm_history": session_state.get("consultation_llm_history", []),
         "general_chat_messages": session_state.get("general_chat_messages", []),
         "post_result_messages": session_state.get("post_result_messages", []),
     }

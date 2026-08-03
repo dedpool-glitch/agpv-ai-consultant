@@ -7,7 +7,7 @@ from constants import (
     APP_TITLE,
     LOCATION_TEXT,
     MONTH_LABELS,
-    GOAL_FOLLOW_UP_UI_TEXT,
+    CONSULTATION_UI_TEXT,
     GENERAL_CHAT_UI_TEXT,
     RESULT_TEXT,
     USER_PROFILE_TEXT,
@@ -20,6 +20,7 @@ from constants import (
 from services.location_geocoder import geocode_location
 from llm.consultation_planner import plan_next_consultation_step
 from llm.general_agpv_answerer import answer_general_agpv_question
+from services.consultation_service import start_consultation
 from services.llm_trace import add_llm_trace
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 
@@ -27,56 +28,6 @@ load_dotenv()
 api_key = os.getenv("PURDUE_GENAI_KEY")
 
 st.title(APP_TITLE)
-
-
-def start_consultation(location_context):
-    plan = plan_next_consultation_step(
-        api_key,
-        user_profile=st.session_state.get("user_profile"),
-        location_context=location_context,
-        consultation_history=[],
-    )
-    add_llm_trace(
-        st.session_state,
-        "consultation_planner",
-        input_summary={
-            "user_profile": st.session_state.get("user_profile"),
-            "location_context": location_context,
-            "consultation_history": [],
-        },
-        output=plan,
-        decision="ready_for_pvmaps" if plan["ready_for_pvmaps"] else "ask_follow_up",
-    )
-    st.session_state["goal_follow_up_started"] = True
-    st.session_state["consultation_messages"] = []
-    st.session_state["consultation_plan_history"] = [plan]
-
-    if plan["ready_for_pvmaps"]:
-        st.session_state["goal_follow_up_complete"] = True
-        st.session_state["post_consultation_route"] = "general_chat"
-        try:
-            run_recommended_pvmaps_estimate(st.session_state, api_key, location_context)
-        except Exception as error:
-            st.session_state.setdefault("general_chat_messages", [])
-            st.session_state["general_chat_messages"].append({
-                "role": "assistant",
-                "content": "I tried to run a background solar-yield estimate, but PVMAPS could not complete the simulation. We can keep discussing the setup and assumptions.",
-            })
-            add_llm_trace(
-                st.session_state,
-                "pvmaps_background_tool",
-                input_summary={"location_context": location_context},
-                output={"error": str(error)},
-                decision="background_estimate_failed",
-            )
-        return
-
-    st.session_state["goal_follow_up_messages"] = [
-        {
-            "role": "assistant",
-            "content": plan["question"],
-        }
-    ]
 
 
 with st.sidebar.expander(TRACE_UI_TEXT["header"], expanded=False):
@@ -142,7 +93,7 @@ if "user_profile" not in st.session_state:
                 "project_goal": project_goal,
                 "goal_details": goal_details,
             }
-            start_consultation(location_context)
+            start_consultation(st.session_state, api_key, location_context)
             st.rerun()
     st.stop()
 
@@ -160,29 +111,29 @@ if "datasheet" in st.session_state:
     st.success(DATASHEET_UPLOAD_TEXT["success"])
     st.write(f"{DATASHEET_UPLOAD_TEXT['uploaded_file_label']}: {st.session_state['datasheet']['name']}")
 
-if "goal_follow_up_complete" not in st.session_state:
-    st.session_state["goal_follow_up_complete"] = False
+if "ready_for_estimate" not in st.session_state:
+    st.session_state["ready_for_estimate"] = False
 
-if not st.session_state["goal_follow_up_complete"]:
-    if "goal_follow_up_started" not in st.session_state:
-        st.session_state["goal_follow_up_started"] = False
+if not st.session_state["ready_for_estimate"]:
+    if "consultation_started" not in st.session_state:
+        st.session_state["consultation_started"] = False
 
-    if not st.session_state["goal_follow_up_started"]:
-        start_consultation(location_context)
+    if not st.session_state["consultation_started"]:
+        start_consultation(st.session_state, api_key, location_context)
         st.rerun()
     else:
-        for message in st.session_state.get("goal_follow_up_messages", []):
+        for message in st.session_state.get("consultation_display_messages", []):
             with st.chat_message(message["role"]):
                 st.write(message["content"])
 
-        answer = st.chat_input(GOAL_FOLLOW_UP_UI_TEXT["answer_label"], key="goal_follow_up_input")
+        answer = st.chat_input(CONSULTATION_UI_TEXT["answer_label"], key="consultation_answer_input")
         if answer:
-            st.session_state["goal_follow_up_messages"].append({
+            st.session_state["consultation_display_messages"].append({
                 "role": "user",
                 "content": answer,
             })
-            st.session_state.setdefault("consultation_messages", [])
-            st.session_state["consultation_messages"].append({
+            st.session_state.setdefault("consultation_llm_history", [])
+            st.session_state["consultation_llm_history"].append({
                 "role": "user",
                 "content": answer,
             })
@@ -191,7 +142,7 @@ if not st.session_state["goal_follow_up_complete"]:
                 api_key,
                 user_profile=st.session_state.get("user_profile"),
                 location_context=location_context,
-                consultation_history=st.session_state["consultation_messages"],
+                consultation_history=st.session_state["consultation_llm_history"],
             )
             add_llm_trace(
                 st.session_state,
@@ -199,7 +150,7 @@ if not st.session_state["goal_follow_up_complete"]:
                 input_summary={
                     "user_profile": st.session_state.get("user_profile"),
                     "location_context": location_context,
-                    "consultation_history": st.session_state["consultation_messages"],
+                    "consultation_history": st.session_state["consultation_llm_history"],
                 },
                 output=plan,
                 decision="ready_for_pvmaps" if plan["ready_for_pvmaps"] else "ask_follow_up",
@@ -208,13 +159,13 @@ if not st.session_state["goal_follow_up_complete"]:
             st.session_state["consultation_plan_history"].append(plan)
 
             if plan["ready_for_pvmaps"]:
-                st.session_state["goal_follow_up_complete"] = True
+                st.session_state["ready_for_estimate"] = True
                 st.session_state["post_consultation_route"] = "general_chat"
-                st.session_state["goal_follow_up_messages"].append({
+                st.session_state["consultation_display_messages"].append({
                     "role": "assistant",
                     "content": "Thanks. I have enough context to prepare a solar-yield estimate in the background.",
                 })
-                st.session_state["general_chat_messages"] = list(st.session_state["goal_follow_up_messages"])
+                st.session_state["general_chat_messages"] = list(st.session_state["consultation_display_messages"])
                 try:
                     run_recommended_pvmaps_estimate(st.session_state, api_key, location_context)
                 except Exception as error:
@@ -231,7 +182,7 @@ if not st.session_state["goal_follow_up_complete"]:
                         decision="background_estimate_failed",
                     )
             else:
-                st.session_state["goal_follow_up_messages"].append({
+                st.session_state["consultation_display_messages"].append({
                     "role": "assistant",
                     "content": plan["question"],
                 })
@@ -242,33 +193,12 @@ if not st.session_state["goal_follow_up_complete"]:
 if "post_consultation_route" not in st.session_state:
     st.session_state["post_consultation_route"] = "general_chat"
 
-# Legacy route kept for reference.
-# Current app flow triggers PVMAPS from general chat using run_recommended_pvmaps_estimate.
-# if st.session_state["post_consultation_route"] == "pvmaps_setup":
-#     try:
-#         run_recommended_pvmaps_estimate(st.session_state, api_key, location_context)
-#     except Exception as error:
-#         st.session_state.setdefault("general_chat_messages", [])
-#         st.session_state["general_chat_messages"].append({
-#             "role": "assistant",
-#             "content": "I tried to run a background solar-yield estimate, but PVMAPS could not complete the simulation. We can keep discussing the setup and assumptions.",
-#         })
-#         add_llm_trace(
-#             st.session_state,
-#             "pvmaps_background_tool",
-#             input_summary={"location_context": location_context},
-#             output={"error": str(error)},
-#             decision="background_estimate_failed",
-#         )
-#     st.session_state["post_consultation_route"] = "general_chat"
-#     st.rerun()
-
 if st.session_state["post_consultation_route"] == "general_chat":
     if GENERAL_CHAT_UI_TEXT["description"]:
         st.write(GENERAL_CHAT_UI_TEXT["description"])
 
     if "general_chat_messages" not in st.session_state:
-        st.session_state["general_chat_messages"] = list(st.session_state.get("goal_follow_up_messages", []))
+        st.session_state["general_chat_messages"] = list(st.session_state.get("consultation_display_messages", []))
 
     for message in st.session_state["general_chat_messages"]:
         if message.get("type") == "latest_estimate":
@@ -298,7 +228,7 @@ if st.session_state["post_consultation_route"] == "general_chat":
             "content": question,
         })
         combined_chat_history = {
-            "consultation_messages": st.session_state.get("consultation_messages", []),
+            "consultation_llm_history": st.session_state.get("consultation_llm_history", []),
             "general_chat_messages": st.session_state["general_chat_messages"],
             "post_result_messages": st.session_state.get("post_result_messages", []),
         }

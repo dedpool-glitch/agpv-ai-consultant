@@ -99,7 +99,7 @@ QUESTIONNAIRE_UI_TEXT = {
     "recommendation_header": "Recommended setup justifications",
 }
 
-GOAL_FOLLOW_UP_UI_TEXT = {
+CONSULTATION_UI_TEXT = {
     "start_description": "Let's narrow things down with a few quick questions.",
     "start_button": "Start consultation",
     "answer_label": "Your answer",
