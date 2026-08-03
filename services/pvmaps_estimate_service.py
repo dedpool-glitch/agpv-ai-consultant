@@ -1,3 +1,5 @@
+import copy
+
 from llm.candidate_config_validator import validate_candidate_config
 from llm.output_generator import explain_output
 from llm.recommended_pvmaps_config import generate_recommended_pvmaps_config
@@ -8,32 +10,50 @@ from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
 from services.llm_trace import add_llm_trace
 
 
-def run_recommended_pvmaps_estimate(session_state, api_key, location_context):
+def run_recommended_pvmaps_estimate(
+    session_state,
+    api_key,
+    location_context,
+    latest_user_message=None,
+    run_label=None,
+):
+    """
+    Run one PVMAPS solar-yield estimate and append it to session_state["pvmaps_runs"].
+
+    Can be called multiple times in one conversation. Any field changes for a
+    variant run (e.g. trying tracking instead of fixed-tilt) are decided by
+    the recommendation step itself, grounded in the user's profile, goal,
+    land context, and their actual latest message — not guessed blindly
+    upstream. A one-off change only affects this run; it does not overwrite
+    the session's baseline questionnaire state.
+    """
     lat = location_context.get("latitude")
     lon = location_context.get("longitude")
 
-    session_state.setdefault("general_chat_messages", [])
+    session_state.setdefault("chat_messages", [])
+    session_state.setdefault("pvmaps_runs", [])
 
     if lat is None or lon is None:
-        session_state["general_chat_messages"].append({
+        session_state["chat_messages"].append({
             "role": "assistant",
             "content": "I can discuss agrivoltaics generally, but I need a site location before I can run a solar-yield estimate.",
         })
         return False
 
-    state = session_state.get("questionnaire_state") or initialize_questionnaire_state()
-    consultation_history = {
-        "consultation_llm_history": session_state.get("consultation_llm_history", []),
-        "general_chat_messages": session_state.get("general_chat_messages", []),
-        "post_result_messages": session_state.get("post_result_messages", []),
+    baseline_state = session_state.get("questionnaire_state") or initialize_questionnaire_state()
+    run_state = copy.deepcopy(baseline_state)
+
+    conversation_history = {
+        "chat_messages": session_state.get("chat_messages", []),
     }
 
     recommendation = generate_recommended_pvmaps_config(
         api_key,
         user_profile=session_state.get("user_profile"),
         location_context=location_context,
-        consultation_history=consultation_history,
-        current_pvmaps_state=state,
+        consultation_history=conversation_history,
+        current_pvmaps_state=run_state,
+        latest_user_message=latest_user_message,
     )
     parsed_recommendation, recommendation_errors = validate_candidate_config(recommendation)
     add_llm_trace(
@@ -42,8 +62,9 @@ def run_recommended_pvmaps_estimate(session_state, api_key, location_context):
         input_summary={
             "user_profile": session_state.get("user_profile"),
             "location_context": location_context,
-            "consultation_history": consultation_history,
-            "current_pvmaps_state": state,
+            "conversation_history": conversation_history,
+            "current_pvmaps_state": run_state,
+            "latest_user_message": latest_user_message,
         },
         output={
             "recommendation": recommendation,
@@ -53,26 +74,44 @@ def run_recommended_pvmaps_estimate(session_state, api_key, location_context):
     )
 
     if recommendation_errors:
-        session_state["general_chat_messages"].append({
+        session_state["chat_messages"].append({
             "role": "assistant",
             "content": "I tried to prepare a solar-yield estimate, but the recommended setup did not pass validation yet. I can still discuss the assumptions or ask a few setup questions.",
         })
         return False
 
     justifications = recommendation.get("justifications", {})
+    newly_confirmed = {}
+    changed_fields = {}
     for field, value in parsed_recommendation.items():
-        if state.get(field) is None:
-            update_questionnaire_state(state, field, value, assumed=True)
+        baseline_value = baseline_state.get(field)
+
+        if baseline_value is None:
+            update_questionnaire_state(run_state, field, value, assumed=True)
             if field in justifications:
-                state["assumptions"].append(f"{field}: {justifications[field]}")
+                run_state["assumptions"].append(f"{field}: {justifications[field]}")
+            newly_confirmed[field] = value
+        elif value != baseline_value:
+            # The recommender explicitly changed an already-set field based on
+            # the user's latest message -- treat this as a one-off variant for
+            # this run only, not a change to the session's baseline.
+            update_questionnaire_state(run_state, field, value, assumed=False)
+            if field in justifications:
+                run_state["assumptions"].append(f"{field}: {justifications[field]}")
+            changed_fields[field] = value
 
-    session_state["questionnaire_state"] = state
-    session_state["recommended_pvmaps_config"] = recommendation
+    # Only fold newly-filled fields back into the shared baseline, so a
+    # one-off "what if" variant doesn't become the new default for future
+    # runs in this session.
+    for field, value in newly_confirmed.items():
+        if baseline_state.get(field) is None:
+            update_questionnaire_state(baseline_state, field, value, assumed=True)
+    session_state["questionnaire_state"] = baseline_state
 
-    pvmaps_input = build_pvmaps_input_from_questionnaire(state, lat, lon)
+    pvmaps_input = build_pvmaps_input_from_questionnaire(run_state, lat, lon)
     errors = validate_pvmaps_input(pvmaps_input)
     if errors:
-        session_state["general_chat_messages"].append({
+        session_state["chat_messages"].append({
             "role": "assistant",
             "content": "I prepared a solar-yield setup, but it failed input validation. The setup needs to be reviewed before running PVMAPS.",
         })
@@ -95,15 +134,20 @@ def run_recommended_pvmaps_estimate(session_state, api_key, location_context):
         session_state.get("user_profile"),
     )
 
-    session_state["latest_pvmaps_input"] = pvmaps_input
-    session_state["latest_pvmaps_output"] = output
-    session_state["latest_pvmaps_explanation"] = explanation
-    session_state.setdefault("post_result_messages", [])
-    session_state["general_chat_messages"].append({
+    run_record = {
+        "label": run_label or ("Variant estimate" if changed_fields else "Solar-yield estimate"),
+        "input": pvmaps_input,
+        "output": output,
+        "explanation": explanation,
+        "overrides": changed_fields,
+    }
+    session_state["pvmaps_runs"].append(run_record)
+    session_state["chat_messages"].append({
         "role": "assistant",
-        "type": "latest_estimate",
+        "type": "pvmaps_run",
+        "run_index": len(session_state["pvmaps_runs"]) - 1,
     })
-    session_state["general_chat_messages"].append({
+    session_state["chat_messages"].append({
         "role": "assistant",
         "content": explanation,
     })
@@ -113,6 +157,7 @@ def run_recommended_pvmaps_estimate(session_state, api_key, location_context):
         input_summary={
             "pvmaps_input": pvmaps_input,
             "recommendation_justifications": justifications,
+            "changed_fields": changed_fields,
         },
         output={
             "pvmaps_output": output,

@@ -33,6 +33,7 @@ def generate_recommended_pvmaps_config(
     location_context=None,
     consultation_history=None,
     current_pvmaps_state=None,
+    latest_user_message=None,
 ):
     schema_text = json.dumps(PVMAPS_FIELD_SCHEMA, indent=2)
 
@@ -45,8 +46,10 @@ def generate_recommended_pvmaps_config(
                 f"Location context:\n{json.dumps(location_context, indent=2)}\n\n"
                 f"Consultation history:\n{json.dumps(consultation_history, indent=2)}\n\n"
                 f"Current PVMAPS state:\n{json.dumps(current_pvmaps_state, indent=2)}\n\n"
+                f"Latest user message:\n{json.dumps(latest_user_message)}\n\n"
                 f"Allowed field schema:\n{schema_text}\n\n"
-                "Generate a recommended PVMAPS setup."
+                "Generate a recommended PVMAPS setup. Only change an already-set field if the "
+                "latest user message explicitly asks for a different value for that specific field."
             ),
         },
     ]
