@@ -7,6 +7,9 @@ def validate_candidate_config(candidate):
     if candidate is None:
         return None, ["LLM did not return valid JSON."]
 
+    if not isinstance(candidate, dict):
+        return None, ["Candidate response must be a JSON object, not a list or other type."]
+
     if candidate.get("_parse_error"):
         return None, [candidate["_parse_error"]]
 
