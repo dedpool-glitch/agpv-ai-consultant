@@ -1,44 +1,80 @@
 import json
 
-from llm.prompts import LLM_SYSTEM_CONSULTATION_PLANNER_PROMPT
+from llm.prompts import LLM_SYSTEM_TURN_ROUTER_PROMPT
 from llm.client import call_llm
 
 
-def plan_next_consultation_step(
+def parse_json_response(response):
+    if response is None:
+        return None
+
+    cleaned_response = response.strip()
+    if cleaned_response.startswith("```json"):
+        cleaned_response = cleaned_response.removeprefix("```json").strip()
+    if cleaned_response.startswith("```"):
+        cleaned_response = cleaned_response.removeprefix("```").strip()
+    if cleaned_response.endswith("```"):
+        cleaned_response = cleaned_response.removesuffix("```").strip()
+
+    try:
+        return json.loads(cleaned_response)
+    except json.JSONDecodeError:
+        json_start = cleaned_response.find("{")
+        json_end = cleaned_response.rfind("}")
+        if json_start == -1 or json_end == -1 or json_end <= json_start:
+            return None
+        try:
+            return json.loads(cleaned_response[json_start:json_end + 1])
+        except json.JSONDecodeError:
+            return None
+
+
+def route_conversation_turn(
     api_key,
     user_profile=None,
     location_context=None,
-    consultation_history=None,
+    conversation_history=None,
+    pvmaps_runs=None,
 ):
+    """
+    Classify the next conversation turn as general_chat, gather_info, or
+    run_pvmaps, so the app can respond flexibly instead of forcing every
+    conversation down a single fixed path toward a PVMAPS estimate.
+    """
     messages = [
-        {"role": "system", "content": LLM_SYSTEM_CONSULTATION_PLANNER_PROMPT},
+        {"role": "system", "content": LLM_SYSTEM_TURN_ROUTER_PROMPT},
         {
             "role": "user",
             "content": (
                 f"User profile:\n{json.dumps(user_profile, indent=2)}\n\n"
                 f"Location context:\n{json.dumps(location_context, indent=2)}\n\n"
-                f"Consultation history:\n{json.dumps(consultation_history, indent=2)}\n\n"
-                "Plan the next consultation step."
+                f"Conversation history:\n{json.dumps(conversation_history, indent=2)}\n\n"
+                f"Prior PVMAPS runs this session:\n{json.dumps(pvmaps_runs, indent=2)}\n\n"
+                "Classify the next turn."
             ),
         },
     ]
 
     response = call_llm(messages, api_key)
+    plan = parse_json_response(response)
 
-    try:
-        plan = json.loads(response)
-    except json.JSONDecodeError:
+    if plan is None:
         return {
-            "question": "What would you like to understand before we move toward a solar-yield estimate?",
+            "turn_type": "general_chat",
+            "question": None,
             "known_facts": [],
-            "reason": "Fallback question because the planner returned invalid JSON.",
-            "ready_for_pvmaps": False,
+            "reason": "Fallback to general chat because the router returned invalid JSON.",
+            "mentioned_location": None,
         }
 
+    turn_type = plan.get("turn_type")
+    if turn_type not in ("general_chat", "gather_info", "run_pvmaps"):
+        turn_type = "general_chat"
+
     return {
+        "turn_type": turn_type,
         "question": plan.get("question"),
         "known_facts": plan.get("known_facts", []),
         "reason": plan.get("reason"),
-        "ready_for_pvmaps": bool(plan.get("ready_for_pvmaps")),
+        "mentioned_location": plan.get("mentioned_location") or None,
     }
-

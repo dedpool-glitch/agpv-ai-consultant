@@ -99,21 +99,10 @@ QUESTIONNAIRE_UI_TEXT = {
     "recommendation_header": "Recommended setup justifications",
 }
 
-CONSULTATION_UI_TEXT = {
-    "start_description": "Let's narrow things down with a few quick questions.",
-    "start_button": "Start consultation",
-    "answer_label": "Your answer",
-    "complete_message": "Thanks. I have enough context to move into the technical setup.",
-    "context_header": "Consultation context",
-}
-
-GENERAL_CHAT_UI_TEXT = {
-    "route_question": "Would you like to discuss agrivoltaics first, or move toward a solar-yield estimate?",
-    "discuss_button": "Discuss first",
-    "estimate_button": "Generate solar estimate",
+CHAT_UI_TEXT = {
     "description": "",
-    "answer_label": "Ask an AgPV question",
-    "start_estimate_button": "Start solar estimate setup",
+    "answer_label": "Ask a question, or tell me about your project",
+    "opening_message": "Hi! Ask me anything about agrivoltaics, or tell me about your project and I can put together a solar-yield estimate when you're ready.",
 }
 
 PVMAPS_RUN_TEXT = {

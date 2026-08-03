@@ -7,8 +7,7 @@ from constants import (
     APP_TITLE,
     LOCATION_TEXT,
     MONTH_LABELS,
-    CONSULTATION_UI_TEXT,
-    GENERAL_CHAT_UI_TEXT,
+    CHAT_UI_TEXT,
     RESULT_TEXT,
     USER_PROFILE_TEXT,
     USER_TYPE_OPTIONS,
@@ -18,9 +17,8 @@ from constants import (
     TRACE_UI_TEXT
 )
 from services.location_geocoder import geocode_location
-from llm.consultation_planner import plan_next_consultation_step
+from llm.consultation_planner import route_conversation_turn
 from llm.general_agpv_answerer import answer_general_agpv_question
-from services.consultation_service import start_consultation
 from services.llm_trace import add_llm_trace
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 
@@ -93,7 +91,10 @@ if "user_profile" not in st.session_state:
                 "project_goal": project_goal,
                 "goal_details": goal_details,
             }
-            start_consultation(st.session_state, api_key, location_context)
+            st.session_state["chat_messages"] = [{
+                "role": "assistant",
+                "content": CHAT_UI_TEXT["opening_message"],
+            }]
             st.rerun()
     st.stop()
 
@@ -111,162 +112,129 @@ if "datasheet" in st.session_state:
     st.success(DATASHEET_UPLOAD_TEXT["success"])
     st.write(f"{DATASHEET_UPLOAD_TEXT['uploaded_file_label']}: {st.session_state['datasheet']['name']}")
 
-if "ready_for_estimate" not in st.session_state:
-    st.session_state["ready_for_estimate"] = False
+st.session_state.setdefault("chat_messages", [{
+    "role": "assistant",
+    "content": CHAT_UI_TEXT["opening_message"],
+}])
+st.session_state.setdefault("pvmaps_runs", [])
 
-if not st.session_state["ready_for_estimate"]:
-    if "consultation_started" not in st.session_state:
-        st.session_state["consultation_started"] = False
+if CHAT_UI_TEXT["description"]:
+    st.write(CHAT_UI_TEXT["description"])
 
-    if not st.session_state["consultation_started"]:
-        start_consultation(st.session_state, api_key, location_context)
-        st.rerun()
-    else:
-        for message in st.session_state.get("consultation_display_messages", []):
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
+for message in st.session_state["chat_messages"]:
+    if message.get("type") == "pvmaps_run":
+        run_index = message["run_index"]
+        pvmaps_runs = st.session_state.get("pvmaps_runs", [])
+        if run_index < len(pvmaps_runs):
+            run = pvmaps_runs[run_index]
+            with st.expander(f"{RESULT_TEXT['latest_estimate_header']}: {run['label']}", expanded=True):
+                st.subheader(LOCATION_TEXT["result_location_header"])
+                st.write(address or "No confirmed site location")
 
-        answer = st.chat_input(CONSULTATION_UI_TEXT["answer_label"], key="consultation_answer_input")
-        if answer:
-            st.session_state["consultation_display_messages"].append({
-                "role": "user",
-                "content": answer,
-            })
-            st.session_state.setdefault("consultation_llm_history", [])
-            st.session_state["consultation_llm_history"].append({
-                "role": "user",
-                "content": answer,
-            })
+                if run.get("overrides"):
+                    st.caption(f"Changed from baseline: {run['overrides']}")
 
-            plan = plan_next_consultation_step(
-                api_key,
-                user_profile=st.session_state.get("user_profile"),
-                location_context=location_context,
-                consultation_history=st.session_state["consultation_llm_history"],
-            )
+                st.subheader(RESULT_TEXT["monthly_yield_header"])
+                fig, ax = plt.subplots(figsize=(10, 5))
+                ax.bar(MONTH_LABELS, run["output"]["monthly_yield"])
+                ax.set_xlabel(RESULT_TEXT["chart_x_label"])
+                ax.set_ylabel(f"Yield ({run['output']['yield_unit']})")
+                ax.set_title(RESULT_TEXT["chart_title"])
+                ax.tick_params(axis="x", labelrotation=45)
+                st.pyplot(fig)
+        continue
+
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+question = st.chat_input(CHAT_UI_TEXT["answer_label"], key="chat_input")
+if question:
+    st.session_state["chat_messages"].append({
+        "role": "user",
+        "content": question,
+    })
+
+    plan = route_conversation_turn(
+        api_key,
+        user_profile=st.session_state.get("user_profile"),
+        location_context=location_context,
+        conversation_history=st.session_state["chat_messages"],
+        pvmaps_runs=st.session_state.get("pvmaps_runs", []),
+    )
+    add_llm_trace(
+        st.session_state,
+        "turn_router",
+        input_summary={
+            "user_profile": st.session_state.get("user_profile"),
+            "location_context": location_context,
+            "conversation_history": st.session_state["chat_messages"],
+            "pvmaps_runs": st.session_state.get("pvmaps_runs", []),
+        },
+        output=plan,
+        decision=plan["turn_type"],
+    )
+
+    if plan.get("mentioned_location"):
+        try:
+            coordinates = geocode_location(plan["mentioned_location"])
+            location_context = {
+                "site_location": plan["mentioned_location"],
+                "confirmed_address": coordinates["address"],
+                "latitude": coordinates["latitude"],
+                "longitude": coordinates["longitude"],
+            }
+            st.session_state["location_context"] = location_context
             add_llm_trace(
                 st.session_state,
-                "consultation_planner",
-                input_summary={
-                    "user_profile": st.session_state.get("user_profile"),
-                    "location_context": location_context,
-                    "consultation_history": st.session_state["consultation_llm_history"],
-                },
-                output=plan,
-                decision="ready_for_pvmaps" if plan["ready_for_pvmaps"] else "ask_follow_up",
+                "location_geocoder",
+                input_summary={"mentioned_location": plan["mentioned_location"]},
+                output=location_context,
+                decision="location_updated",
             )
-            st.session_state.setdefault("consultation_plan_history", [])
-            st.session_state["consultation_plan_history"].append(plan)
-
-            if plan["ready_for_pvmaps"]:
-                st.session_state["ready_for_estimate"] = True
-                st.session_state["post_consultation_route"] = "general_chat"
-                st.session_state["consultation_display_messages"].append({
-                    "role": "assistant",
-                    "content": "Thanks. I have enough context to prepare a solar-yield estimate in the background.",
-                })
-                st.session_state["general_chat_messages"] = list(st.session_state["consultation_display_messages"])
-                try:
-                    run_recommended_pvmaps_estimate(st.session_state, api_key, location_context)
-                except Exception as error:
-                    st.session_state.setdefault("general_chat_messages", [])
-                    st.session_state["general_chat_messages"].append({
-                        "role": "assistant",
-                        "content": "I tried to run a background solar-yield estimate, but PVMAPS could not complete the simulation. We can keep discussing the setup and assumptions.",
-                    })
-                    add_llm_trace(
-                        st.session_state,
-                        "pvmaps_background_tool",
-                        input_summary={"location_context": location_context},
-                        output={"error": str(error)},
-                        decision="background_estimate_failed",
-                    )
-            else:
-                st.session_state["consultation_display_messages"].append({
-                    "role": "assistant",
-                    "content": plan["question"],
-                })
+        except Exception as error:
+            st.session_state["chat_messages"].append({
+                "role": "assistant",
+                "content": f"I couldn't confirm that location ('{plan['mentioned_location']}'). Could you try a simpler city/state or check the spelling?",
+            })
+            add_llm_trace(
+                st.session_state,
+                "location_geocoder",
+                input_summary={"mentioned_location": plan["mentioned_location"]},
+                output={"error": str(error)},
+                decision="location_update_failed",
+            )
             st.rerun()
 
-    st.stop()
-
-if "post_consultation_route" not in st.session_state:
-    st.session_state["post_consultation_route"] = "general_chat"
-
-if st.session_state["post_consultation_route"] == "general_chat":
-    if GENERAL_CHAT_UI_TEXT["description"]:
-        st.write(GENERAL_CHAT_UI_TEXT["description"])
-
-    if "general_chat_messages" not in st.session_state:
-        st.session_state["general_chat_messages"] = list(st.session_state.get("consultation_display_messages", []))
-
-    for message in st.session_state["general_chat_messages"]:
-        if message.get("type") == "latest_estimate":
-            latest_output = st.session_state.get("latest_pvmaps_output")
-            if latest_output:
-                with st.expander(RESULT_TEXT["latest_estimate_header"], expanded=True):
-                    st.subheader(LOCATION_TEXT["result_location_header"])
-                    st.write(address or "No confirmed site location")
-
-                    st.subheader(RESULT_TEXT["monthly_yield_header"])
-                    fig, ax = plt.subplots(figsize=(10, 5))
-                    ax.bar(MONTH_LABELS, latest_output["monthly_yield"])
-                    ax.set_xlabel(RESULT_TEXT["chart_x_label"])
-                    ax.set_ylabel(f"Yield ({latest_output['yield_unit']})")
-                    ax.set_title(RESULT_TEXT["chart_title"])
-                    ax.tick_params(axis="x", labelrotation=45)
-                    st.pyplot(fig)
-            continue
-
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-
-    question = st.chat_input(GENERAL_CHAT_UI_TEXT["answer_label"], key="general_agpv_input")
-    if question:
-        st.session_state["general_chat_messages"].append({
-            "role": "user",
-            "content": question,
+    if plan["turn_type"] == "gather_info" and plan.get("question"):
+        st.session_state["chat_messages"].append({
+            "role": "assistant",
+            "content": plan["question"],
         })
-        combined_chat_history = {
-            "consultation_llm_history": st.session_state.get("consultation_llm_history", []),
-            "general_chat_messages": st.session_state["general_chat_messages"],
-            "post_result_messages": st.session_state.get("post_result_messages", []),
-        }
 
-        plan = plan_next_consultation_step(
-            api_key,
-            user_profile=st.session_state.get("user_profile"),
-            location_context=location_context,
-            consultation_history=combined_chat_history,
-        )
-        add_llm_trace(
-            st.session_state,
-            "consultation_planner",
-            input_summary={
-                "user_profile": st.session_state.get("user_profile"),
-                "location_context": location_context,
-                "consultation_history": combined_chat_history,
-            },
-            output=plan,
-            decision="run_background_estimate" if plan["ready_for_pvmaps"] else "continue_chat",
-        )
+    elif plan["turn_type"] == "run_pvmaps":
+        try:
+            run_recommended_pvmaps_estimate(
+                st.session_state,
+                api_key,
+                location_context,
+                latest_user_message=question,
+            )
+        except Exception as error:
+            st.session_state["chat_messages"].append({
+                "role": "assistant",
+                "content": "I tried to run a solar-yield estimate, but PVMAPS could not complete the simulation. We can keep discussing the setup and assumptions.",
+            })
+            add_llm_trace(
+                st.session_state,
+                "pvmaps_background_tool",
+                input_summary={"location_context": location_context},
+                output={"error": str(error)},
+                decision="estimate_failed",
+            )
 
-        if plan["ready_for_pvmaps"] and "latest_pvmaps_output" not in st.session_state:
-            try:
-                run_recommended_pvmaps_estimate(st.session_state, api_key, location_context)
-            except Exception as error:
-                st.session_state["general_chat_messages"].append({
-                    "role": "assistant",
-                    "content": "I tried to run a background solar-yield estimate, but PVMAPS could not complete the simulation. We can keep discussing the setup and assumptions.",
-                })
-                add_llm_trace(
-                    st.session_state,
-                    "pvmaps_background_tool",
-                    input_summary={"location_context": location_context},
-                    output={"error": str(error)},
-                    decision="background_estimate_failed",
-                )
-            st.rerun()
+    else:
+        pvmaps_runs = st.session_state.get("pvmaps_runs", [])
+        latest_pvmaps_output = pvmaps_runs[-1]["output"] if pvmaps_runs else None
 
         answer = answer_general_agpv_question(
             question,
@@ -274,8 +242,8 @@ if st.session_state["post_consultation_route"] == "general_chat":
             user_profile=st.session_state.get("user_profile"),
             location_context=location_context,
             pvmaps_state=st.session_state.get("questionnaire_state"),
-            latest_pvmaps_output=st.session_state.get("latest_pvmaps_output"),
-            conversation_history=combined_chat_history,
+            latest_pvmaps_output=latest_pvmaps_output,
+            conversation_history=st.session_state["chat_messages"],
         )
         add_llm_trace(
             st.session_state,
@@ -284,15 +252,14 @@ if st.session_state["post_consultation_route"] == "general_chat":
                 "question": question,
                 "user_profile": st.session_state.get("user_profile"),
                 "location_context": location_context,
-                "conversation_history": combined_chat_history,
+                "conversation_history": st.session_state["chat_messages"],
             },
             output={"answer": answer},
             decision="answered_general_question",
         )
-        st.session_state["general_chat_messages"].append({
+        st.session_state["chat_messages"].append({
             "role": "assistant",
             "content": answer,
         })
-        st.rerun()
 
-    st.stop()
+    st.rerun()
