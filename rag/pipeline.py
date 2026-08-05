@@ -87,6 +87,55 @@ def search_collection(collection_name, query, n_results=5, db_path=None):
     return format_query_results(results)
 
 
+PAPERS_COLLECTION_NAME = "ceed_group_papers"
+BOOKS_COLLECTION_NAME = "ceed_group_books"
+
+SOURCE_TO_COLLECTIONS = {
+    "papers": [PAPERS_COLLECTION_NAME],
+    "books": [BOOKS_COLLECTION_NAME],
+    "both": [PAPERS_COLLECTION_NAME, BOOKS_COLLECTION_NAME],
+    "none": [],
+}
+
+
+def retrieve_for_source(source, query, n_results=3, db_path=None):
+    """
+    Retrieve chunks for a "none"/"papers"/"books"/"both" source decision.
+
+    Each collection is queried independently and failures are swallowed per
+    collection, so one missing/broken collection doesn't block retrieval
+    from the other, and any failure here just means less context rather
+    than a broken turn.
+    """
+    retrieved_chunks = []
+
+    for collection_name in SOURCE_TO_COLLECTIONS.get(source, []):
+        try:
+            retrieved_chunks.extend(
+                search_collection(collection_name, query, n_results=n_results, db_path=db_path)
+            )
+        except Exception:
+            continue
+
+    return retrieved_chunks
+
+
+def summarize_retrieved_chunks(retrieved_chunks):
+    """
+    Trace-friendly summary of retrieved chunks -- text, source, page, and
+    match distance, without the raw chunk id noise.
+    """
+    return [
+        {
+            "text": chunk["text"],
+            "title": chunk.get("metadata", {}).get("title"),
+            "page": chunk.get("metadata", {}).get("page"),
+            "distance": chunk.get("distance"),
+        }
+        for chunk in retrieved_chunks
+    ]
+
+
 def answer_from_collection(
     collection_name,
     question,

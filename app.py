@@ -19,6 +19,8 @@ from constants import (
 from services.location_geocoder import geocode_location
 from llm.consultation_planner import route_conversation_turn
 from llm.general_agpv_answerer import answer_general_agpv_question
+from llm.rag_source_router import decide_rag_source
+from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
 from services.llm_trace import add_llm_trace
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 
@@ -236,6 +238,40 @@ if question:
         pvmaps_runs = st.session_state.get("pvmaps_runs", [])
         latest_pvmaps_output = pvmaps_runs[-1]["output"] if pvmaps_runs else None
 
+        retrieved_context = []
+        try:
+            rag_plan = decide_rag_source(
+                question,
+                api_key,
+                conversation_history=st.session_state["chat_messages"],
+            )
+            add_llm_trace(
+                st.session_state,
+                "rag_source_router",
+                input_summary={"question": question},
+                output=rag_plan,
+                decision=rag_plan["source"],
+            )
+            retrieved_context = retrieve_for_source(rag_plan["source"], question)
+            add_llm_trace(
+                st.session_state,
+                "rag_retrieval",
+                input_summary={"question": question, "source": rag_plan["source"]},
+                output={
+                    "retrieved_count": len(retrieved_context),
+                    "chunks": summarize_retrieved_chunks(retrieved_context),
+                },
+                decision="chunks_retrieved" if retrieved_context else "no_chunks_found",
+            )
+        except Exception as error:
+            add_llm_trace(
+                st.session_state,
+                "rag_source_router",
+                input_summary={"question": question},
+                output={"error": str(error)},
+                decision="rag_skipped_due_to_error",
+            )
+
         answer = answer_general_agpv_question(
             question,
             api_key,
@@ -244,6 +280,7 @@ if question:
             pvmaps_state=st.session_state.get("questionnaire_state"),
             latest_pvmaps_output=latest_pvmaps_output,
             conversation_history=st.session_state["chat_messages"],
+            retrieved_context=retrieved_context,
         )
         add_llm_trace(
             st.session_state,
@@ -253,6 +290,7 @@ if question:
                 "user_profile": st.session_state.get("user_profile"),
                 "location_context": location_context,
                 "conversation_history": st.session_state["chat_messages"],
+                "retrieved_context_count": len(retrieved_context),
             },
             output={"answer": answer},
             decision="answered_general_question",
