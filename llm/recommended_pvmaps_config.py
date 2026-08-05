@@ -3,28 +3,21 @@ import json
 from constants import PVMAPS_FIELD_SCHEMA
 from llm.prompts import LLM_SYSTEM_RECOMMENDED_PVMAPS_CONFIG_PROMPT
 from llm.client import call_llm
+from llm.json_utils import parse_json_response
 
 
-def parse_json_response(response):
-    if response is None:
-        return None
+def format_retrieved_context(retrieved_context):
+    if not retrieved_context:
+        return "None available."
 
-    cleaned_response = response.strip()
-    if cleaned_response.startswith("```json"):
-        cleaned_response = cleaned_response.removeprefix("```json").strip()
-    if cleaned_response.startswith("```"):
-        cleaned_response = cleaned_response.removeprefix("```").strip()
-    if cleaned_response.endswith("```"):
-        cleaned_response = cleaned_response.removesuffix("```").strip()
+    context_blocks = []
+    for index, chunk in enumerate(retrieved_context, start=1):
+        metadata = chunk.get("metadata", {})
+        title = metadata.get("title", "Unknown source")
+        page = metadata.get("page", "unknown page")
+        context_blocks.append(f"Excerpt {index} ({title}, page {page}):\n{chunk['text']}")
 
-    try:
-        return json.loads(cleaned_response)
-    except json.JSONDecodeError:
-        json_start = cleaned_response.find("{")
-        json_end = cleaned_response.rfind("}")
-        if json_start == -1 or json_end == -1 or json_end <= json_start:
-            return None
-        return json.loads(cleaned_response[json_start:json_end + 1])
+    return "\n---\n".join(context_blocks)
 
 
 def generate_recommended_pvmaps_config(
@@ -34,8 +27,10 @@ def generate_recommended_pvmaps_config(
     consultation_history=None,
     current_pvmaps_state=None,
     latest_user_message=None,
+    retrieved_context=None,
 ):
     schema_text = json.dumps(PVMAPS_FIELD_SCHEMA, indent=2)
+    context_text = format_retrieved_context(retrieved_context)
 
     messages = [
         {"role": "system", "content": LLM_SYSTEM_RECOMMENDED_PVMAPS_CONFIG_PROMPT},
@@ -47,6 +42,7 @@ def generate_recommended_pvmaps_config(
                 f"Consultation history:\n{json.dumps(consultation_history, indent=2)}\n\n"
                 f"Current PVMAPS state:\n{json.dumps(current_pvmaps_state, indent=2)}\n\n"
                 f"Latest user message:\n{json.dumps(latest_user_message)}\n\n"
+                f"Relevant research context:\n{context_text}\n\n"
                 f"Allowed field schema:\n{schema_text}\n\n"
                 "Generate a recommended PVMAPS setup. Only change an already-set field if the "
                 "latest user message explicitly asks for a different value for that specific field."
@@ -56,10 +52,7 @@ def generate_recommended_pvmaps_config(
 
     response = call_llm(messages, api_key)
 
-    try:
-        parsed_response = parse_json_response(response)
-    except json.JSONDecodeError:
-        parsed_response = None
+    parsed_response = parse_json_response(response)
 
     if parsed_response is None:
         return {

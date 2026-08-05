@@ -7,7 +7,26 @@ from pvmaps.input_validator import validate_pvmaps_input
 from pvmaps.matlab_runner import run_pvmaps
 from questionnaire.state import initialize_questionnaire_state, update_questionnaire_state
 from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
+from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
 from services.llm_trace import add_llm_trace
+
+
+def retrieve_recommendation_context(session_state, latest_user_message):
+    """
+    Best-effort retrieval to ground the Recommender's parameter choices in
+    the actual research corpus. Any failure here just means the Recommender
+    falls back to its own general knowledge, same as before this existed.
+    """
+    query = latest_user_message
+    if not query:
+        user_profile = session_state.get("user_profile") or {}
+        goal = user_profile.get("project_goal", "solar farm design")
+        query = f"PVMAPS solar farm design recommendations for {goal}"
+
+    try:
+        return retrieve_for_source("both", query, n_results=2)
+    except Exception:
+        return []
 
 
 def run_recommended_pvmaps_estimate(
@@ -47,6 +66,18 @@ def run_recommended_pvmaps_estimate(
         "chat_messages": session_state.get("chat_messages", []),
     }
 
+    retrieved_context = retrieve_recommendation_context(session_state, latest_user_message)
+    add_llm_trace(
+        session_state,
+        "recommendation_context_retrieval",
+        input_summary={"latest_user_message": latest_user_message},
+        output={
+            "retrieved_count": len(retrieved_context),
+            "chunks": summarize_retrieved_chunks(retrieved_context),
+        },
+        decision="context_retrieved" if retrieved_context else "no_context_found",
+    )
+
     recommendation = generate_recommended_pvmaps_config(
         api_key,
         user_profile=session_state.get("user_profile"),
@@ -54,6 +85,7 @@ def run_recommended_pvmaps_estimate(
         consultation_history=conversation_history,
         current_pvmaps_state=run_state,
         latest_user_message=latest_user_message,
+        retrieved_context=retrieved_context,
     )
     parsed_recommendation, recommendation_errors = validate_candidate_config(recommendation)
     add_llm_trace(
@@ -65,6 +97,7 @@ def run_recommended_pvmaps_estimate(
             "conversation_history": conversation_history,
             "current_pvmaps_state": run_state,
             "latest_user_message": latest_user_message,
+            "retrieved_context_count": len(retrieved_context),
         },
         output={
             "recommendation": recommendation,
