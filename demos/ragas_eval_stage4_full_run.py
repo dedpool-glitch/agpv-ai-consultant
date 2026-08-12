@@ -20,10 +20,11 @@ from ragas.embeddings.base import embedding_factory
 from ragas.llms import llm_factory
 from ragas.metrics.collections import AnswerRelevancy, ContextUtilization, Faithfulness
 
+from constants import PAPERS_COLLECTION_NAME
 from demos.rag_answer_demo import RAG_DEMO_CASES
 from rag.pipeline import answer_from_collection
 
-COLLECTION_NAME = "ceed_group_papers"
+COLLECTION_NAME = PAPERS_COLLECTION_NAME
 OUTPUT_PATH = Path(r"D:\agpv-ai-consultant\outputs\ragas_eval_results.csv")
 
 

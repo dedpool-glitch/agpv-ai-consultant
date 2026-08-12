@@ -16,15 +16,16 @@ from openai import AsyncOpenAI
 from ragas.llms import llm_factory
 from ragas.metrics.collections import Faithfulness
 
+from constants import GENAI_API_KEY_ENV_VAR, PAPERS_COLLECTION_NAME
 from rag.pipeline import answer_from_collection
 
 
 def main():
     load_dotenv()
-    api_key = os.getenv("PURDUE_GENAI_KEY")
+    api_key = os.getenv(GENAI_API_KEY_ENV_VAR)
 
     if not api_key:
-        raise ValueError("PURDUE_GENAI_KEY is missing from the environment.")
+        raise ValueError(f"{GENAI_API_KEY_ENV_VAR} is missing from the environment.")
 
     client = AsyncOpenAI(
         base_url="https://genai.rcac.purdue.edu/api",
@@ -35,7 +36,7 @@ def main():
     question = "If I leave more space between solar panel rows, how would that affect the system?"
 
     result = answer_from_collection(
-        collection_name="ceed_group_papers",
+        collection_name=PAPERS_COLLECTION_NAME,
         question=question,
         api_key=api_key,
         n_results=3,

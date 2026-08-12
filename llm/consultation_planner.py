@@ -1,5 +1,6 @@
 import json
 
+from constants import TURN_TYPE_GENERAL_CHAT, TURN_TYPES
 from llm.prompts import LLM_SYSTEM_TURN_ROUTER_PROMPT
 from llm.client import call_llm
 from llm.json_utils import parse_json_response
@@ -36,7 +37,7 @@ def route_conversation_turn(
 
     if plan is None:
         return {
-            "turn_type": "general_chat",
+            "turn_type": TURN_TYPE_GENERAL_CHAT,
             "question": None,
             "known_facts": [],
             "reason": "Fallback to general chat because the router returned invalid JSON.",
@@ -44,8 +45,8 @@ def route_conversation_turn(
         }
 
     turn_type = plan.get("turn_type")
-    if turn_type not in ("general_chat", "gather_info", "run_pvmaps"):
-        turn_type = "general_chat"
+    if turn_type not in TURN_TYPES:
+        turn_type = TURN_TYPE_GENERAL_CHAT
 
     return {
         "turn_type": turn_type,

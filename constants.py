@@ -281,3 +281,46 @@ DATASHEET_UPLOAD_TEXT = {
     "uploaded_file_label": "Uploaded datasheet",
 }
 
+# --- Turn router ---
+# The three ways a conversation turn can be classified. Used by
+# llm/consultation_planner.py (routing) and app.py (branching on the result).
+TURN_TYPE_GENERAL_CHAT = "general_chat"
+TURN_TYPE_GATHER_INFO = "gather_info"
+TURN_TYPE_RUN_PVMAPS = "run_pvmaps"
+TURN_TYPES = (TURN_TYPE_GENERAL_CHAT, TURN_TYPE_GATHER_INFO, TURN_TYPE_RUN_PVMAPS)
+
+# --- RAG source router ---
+# Which retrieval collection(s), if any, should back a general_chat answer.
+# Used by llm/rag_source_router.py (routing) and rag/pipeline.py (retrieval).
+RAG_SOURCE_NONE = "none"
+RAG_SOURCE_PAPERS = "papers"
+RAG_SOURCE_BOOKS = "books"
+RAG_SOURCE_BOTH = "both"
+RAG_SOURCES = (RAG_SOURCE_NONE, RAG_SOURCE_PAPERS, RAG_SOURCE_BOOKS, RAG_SOURCE_BOTH)
+
+# ChromaDB collection names.
+PAPERS_COLLECTION_NAME = "ceed_group_papers"
+BOOKS_COLLECTION_NAME = "ceed_group_books"
+
+# --- Chat message shape ---
+# Roles used in st.session_state["chat_messages"] entries.
+MESSAGE_ROLE_USER = "user"
+MESSAGE_ROLE_ASSISTANT = "assistant"
+# Marks a chat message as a rendered PVMAPS result card rather than plain text.
+MESSAGE_TYPE_PVMAPS_RUN = "pvmaps_run"
+
+# --- st.session_state keys ---
+SESSION_KEY_USER_PROFILE = "user_profile"
+SESSION_KEY_LOCATION_CONTEXT = "location_context"
+SESSION_KEY_CHAT_MESSAGES = "chat_messages"
+SESSION_KEY_PVMAPS_RUNS = "pvmaps_runs"
+SESSION_KEY_QUESTIONNAIRE_STATE = "questionnaire_state"
+SESSION_KEY_DATASHEET = "datasheet"
+SESSION_KEY_LLM_TRACE = "llm_trace"
+
+# --- PVMAPS model ---
+PVMAPS_SCRIPT_PATH = r"D:/agpv-ai-consultant/PV-MAPS-main"
+
+# --- Environment ---
+GENAI_API_KEY_ENV_VAR = "PURDUE_GENAI_KEY"
+

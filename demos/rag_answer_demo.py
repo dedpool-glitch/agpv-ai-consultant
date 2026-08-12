@@ -4,10 +4,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from constants import PAPERS_COLLECTION_NAME
 from rag.pipeline import answer_from_collection
 
 
-COLLECTION_NAME = "ceed_group_papers"
+COLLECTION_NAME = PAPERS_COLLECTION_NAME
 OUTPUT_PATH = Path(r"D:\agpv-ai-consultant\outputs\rag_answer_demo_results.csv")
 
 

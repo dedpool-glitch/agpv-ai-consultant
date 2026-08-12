@@ -1,8 +1,9 @@
+from constants import PAPERS_COLLECTION_NAME
 from rag.pipeline import build_collection_from_path, search_collection
 
 
 RESOURCE_FOLDER = r"D:\agpv-ai-consultant\resources"
-COLLECTION_NAME = "ceed_group_papers"
+COLLECTION_NAME = PAPERS_COLLECTION_NAME
 
 
 def main():

@@ -1,5 +1,6 @@
 import json
 
+from constants import RAG_SOURCE_NONE, RAG_SOURCES
 from llm.prompts import LLM_SYSTEM_RAG_SOURCE_ROUTER_PROMPT
 from llm.client import call_llm
 from llm.json_utils import parse_json_response
@@ -31,13 +32,13 @@ def decide_rag_source(question, api_key, conversation_history=None):
 
     if plan is None:
         return {
-            "source": "none",
+            "source": RAG_SOURCE_NONE,
             "reason": "Fallback to none because the router returned invalid JSON.",
         }
 
     source = plan.get("source")
-    if source not in ("none", "papers", "books", "both"):
-        source = "none"
+    if source not in RAG_SOURCES:
+        source = RAG_SOURCE_NONE
 
     return {
         "source": source,

@@ -14,7 +14,20 @@ from constants import (
     SOLAR_EXPERIENCE_OPTIONS,
     DATASHEET_UPLOAD_TEXT,
     PROJECT_GOAL_OPTIONS,
-    TRACE_UI_TEXT
+    TRACE_UI_TEXT,
+    GENAI_API_KEY_ENV_VAR,
+    MESSAGE_ROLE_ASSISTANT,
+    MESSAGE_ROLE_USER,
+    MESSAGE_TYPE_PVMAPS_RUN,
+    SESSION_KEY_CHAT_MESSAGES,
+    SESSION_KEY_DATASHEET,
+    SESSION_KEY_LLM_TRACE,
+    SESSION_KEY_LOCATION_CONTEXT,
+    SESSION_KEY_PVMAPS_RUNS,
+    SESSION_KEY_QUESTIONNAIRE_STATE,
+    SESSION_KEY_USER_PROFILE,
+    TURN_TYPE_GATHER_INFO,
+    TURN_TYPE_RUN_PVMAPS,
 )
 from services.location_geocoder import geocode_location
 from llm.consultation_planner import route_conversation_turn
@@ -25,16 +38,16 @@ from services.llm_trace import add_llm_trace
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 
 load_dotenv()
-api_key = os.getenv("PURDUE_GENAI_KEY")
+api_key = os.getenv(GENAI_API_KEY_ENV_VAR)
 
 st.title(APP_TITLE)
 
 
 with st.sidebar.expander(TRACE_UI_TEXT["header"], expanded=False):
-    if not st.session_state.get("llm_trace"):
+    if not st.session_state.get(SESSION_KEY_LLM_TRACE):
         st.write(TRACE_UI_TEXT["empty_message"])
     else:
-        for index, trace in enumerate(st.session_state["llm_trace"], start=1):
+        for index, trace in enumerate(st.session_state[SESSION_KEY_LLM_TRACE], start=1):
             st.markdown(f"**{index}. {trace['stage']}** `{trace['time']}`")
             if trace.get("decision"):
                 st.write("Decision:", trace["decision"])
@@ -47,7 +60,7 @@ with st.sidebar.expander(TRACE_UI_TEXT["header"], expanded=False):
             st.divider()
 
 
-if "user_profile" not in st.session_state:
+if SESSION_KEY_USER_PROFILE not in st.session_state:
     st.subheader(USER_PROFILE_TEXT["header"])
     with st.form("user_profile_form"):
         user_type = st.selectbox(USER_PROFILE_TEXT["user_type_label"], options=USER_TYPE_OPTIONS)
@@ -79,28 +92,28 @@ if "user_profile" not in st.session_state:
                     st.error("I could not confirm that location. You can leave it blank for now or try a simpler city/state.")
                     st.stop()
 
-            st.session_state["location_context"] = location_context
+            st.session_state[SESSION_KEY_LOCATION_CONTEXT] = location_context
             if datasheet:
-                st.session_state["datasheet"] = {
+                st.session_state[SESSION_KEY_DATASHEET] = {
                     "name": datasheet.name,
                     "type": datasheet.type,
                     "bytes": datasheet.getvalue(),
                 }
-            st.session_state["user_profile"] = {
+            st.session_state[SESSION_KEY_USER_PROFILE] = {
                 "user_type": user_type,
                 "user_role_details": user_role_details,
                 "solar_experience": solar_experience,
                 "project_goal": project_goal,
                 "goal_details": goal_details,
             }
-            st.session_state["chat_messages"] = [{
-                "role": "assistant",
+            st.session_state[SESSION_KEY_CHAT_MESSAGES] = [{
+                "role": MESSAGE_ROLE_ASSISTANT,
                 "content": CHAT_UI_TEXT["opening_message"],
             }]
             st.rerun()
     st.stop()
 
-location_context = st.session_state.get("location_context", {})
+location_context = st.session_state.get(SESSION_KEY_LOCATION_CONTEXT, {})
 lat = location_context.get("latitude")
 lon = location_context.get("longitude")
 address = location_context.get("confirmed_address")
@@ -110,23 +123,23 @@ if address:
 else:
     st.info("No site selected yet. I can answer general questions, but I will need a location before running PVMAPS.")
 
-if "datasheet" in st.session_state:
+if SESSION_KEY_DATASHEET in st.session_state:
     st.success(DATASHEET_UPLOAD_TEXT["success"])
-    st.write(f"{DATASHEET_UPLOAD_TEXT['uploaded_file_label']}: {st.session_state['datasheet']['name']}")
+    st.write(f"{DATASHEET_UPLOAD_TEXT['uploaded_file_label']}: {st.session_state[SESSION_KEY_DATASHEET]['name']}")
 
-st.session_state.setdefault("chat_messages", [{
-    "role": "assistant",
+st.session_state.setdefault(SESSION_KEY_CHAT_MESSAGES, [{
+    "role": MESSAGE_ROLE_ASSISTANT,
     "content": CHAT_UI_TEXT["opening_message"],
 }])
-st.session_state.setdefault("pvmaps_runs", [])
+st.session_state.setdefault(SESSION_KEY_PVMAPS_RUNS, [])
 
 if CHAT_UI_TEXT["description"]:
     st.write(CHAT_UI_TEXT["description"])
 
-for message in st.session_state["chat_messages"]:
-    if message.get("type") == "pvmaps_run":
+for message in st.session_state[SESSION_KEY_CHAT_MESSAGES]:
+    if message.get("type") == MESSAGE_TYPE_PVMAPS_RUN:
         run_index = message["run_index"]
-        pvmaps_runs = st.session_state.get("pvmaps_runs", [])
+        pvmaps_runs = st.session_state.get(SESSION_KEY_PVMAPS_RUNS, [])
         if run_index < len(pvmaps_runs):
             run = pvmaps_runs[run_index]
             with st.expander(f"{RESULT_TEXT['latest_estimate_header']}: {run['label']}", expanded=True):
@@ -151,26 +164,26 @@ for message in st.session_state["chat_messages"]:
 
 question = st.chat_input(CHAT_UI_TEXT["answer_label"], key="chat_input")
 if question:
-    st.session_state["chat_messages"].append({
-        "role": "user",
+    st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+        "role": MESSAGE_ROLE_USER,
         "content": question,
     })
 
     plan = route_conversation_turn(
         api_key,
-        user_profile=st.session_state.get("user_profile"),
+        user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
         location_context=location_context,
-        conversation_history=st.session_state["chat_messages"],
-        pvmaps_runs=st.session_state.get("pvmaps_runs", []),
+        conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
+        pvmaps_runs=st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
     )
     add_llm_trace(
         st.session_state,
         "turn_router",
         input_summary={
-            "user_profile": st.session_state.get("user_profile"),
-            "location_context": location_context,
-            "conversation_history": st.session_state["chat_messages"],
-            "pvmaps_runs": st.session_state.get("pvmaps_runs", []),
+            SESSION_KEY_USER_PROFILE: st.session_state.get(SESSION_KEY_USER_PROFILE),
+            SESSION_KEY_LOCATION_CONTEXT: location_context,
+            "conversation_history": st.session_state[SESSION_KEY_CHAT_MESSAGES],
+            SESSION_KEY_PVMAPS_RUNS: st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
         },
         output=plan,
         decision=plan["turn_type"],
@@ -185,7 +198,7 @@ if question:
                 "latitude": coordinates["latitude"],
                 "longitude": coordinates["longitude"],
             }
-            st.session_state["location_context"] = location_context
+            st.session_state[SESSION_KEY_LOCATION_CONTEXT] = location_context
             add_llm_trace(
                 st.session_state,
                 "location_geocoder",
@@ -194,8 +207,8 @@ if question:
                 decision="location_updated",
             )
         except Exception as error:
-            st.session_state["chat_messages"].append({
-                "role": "assistant",
+            st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+                "role": MESSAGE_ROLE_ASSISTANT,
                 "content": f"I couldn't confirm that location ('{plan['mentioned_location']}'). Could you try a simpler city/state or check the spelling?",
             })
             add_llm_trace(
@@ -207,13 +220,13 @@ if question:
             )
             st.rerun()
 
-    if plan["turn_type"] == "gather_info" and plan.get("question"):
-        st.session_state["chat_messages"].append({
-            "role": "assistant",
+    if plan["turn_type"] == TURN_TYPE_GATHER_INFO and plan.get("question"):
+        st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+            "role": MESSAGE_ROLE_ASSISTANT,
             "content": plan["question"],
         })
 
-    elif plan["turn_type"] == "run_pvmaps":
+    elif plan["turn_type"] == TURN_TYPE_RUN_PVMAPS:
         try:
             run_recommended_pvmaps_estimate(
                 st.session_state,
@@ -222,20 +235,20 @@ if question:
                 latest_user_message=question,
             )
         except Exception as error:
-            st.session_state["chat_messages"].append({
-                "role": "assistant",
+            st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+                "role": MESSAGE_ROLE_ASSISTANT,
                 "content": "I tried to run a solar-yield estimate, but PVMAPS could not complete the simulation. We can keep discussing the setup and assumptions.",
             })
             add_llm_trace(
                 st.session_state,
                 "pvmaps_background_tool",
-                input_summary={"location_context": location_context},
+                input_summary={SESSION_KEY_LOCATION_CONTEXT: location_context},
                 output={"error": str(error)},
                 decision="estimate_failed",
             )
 
     else:
-        pvmaps_runs = st.session_state.get("pvmaps_runs", [])
+        pvmaps_runs = st.session_state.get(SESSION_KEY_PVMAPS_RUNS, [])
         latest_pvmaps_output = pvmaps_runs[-1]["output"] if pvmaps_runs else None
 
         retrieved_context = []
@@ -243,7 +256,7 @@ if question:
             rag_plan = decide_rag_source(
                 question,
                 api_key,
-                conversation_history=st.session_state["chat_messages"],
+                conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
             )
             add_llm_trace(
                 st.session_state,
@@ -275,11 +288,11 @@ if question:
         answer = answer_general_agpv_question(
             question,
             api_key,
-            user_profile=st.session_state.get("user_profile"),
+            user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
             location_context=location_context,
-            pvmaps_state=st.session_state.get("questionnaire_state"),
+            pvmaps_state=st.session_state.get(SESSION_KEY_QUESTIONNAIRE_STATE),
             latest_pvmaps_output=latest_pvmaps_output,
-            conversation_history=st.session_state["chat_messages"],
+            conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
             retrieved_context=retrieved_context,
         )
         add_llm_trace(
@@ -287,16 +300,16 @@ if question:
             "general_agpv_answerer",
             input_summary={
                 "question": question,
-                "user_profile": st.session_state.get("user_profile"),
-                "location_context": location_context,
-                "conversation_history": st.session_state["chat_messages"],
+                SESSION_KEY_USER_PROFILE: st.session_state.get(SESSION_KEY_USER_PROFILE),
+                SESSION_KEY_LOCATION_CONTEXT: location_context,
+                "conversation_history": st.session_state[SESSION_KEY_CHAT_MESSAGES],
                 "retrieved_context_count": len(retrieved_context),
             },
             output={"answer": answer},
             decision="answered_general_question",
         )
-        st.session_state["chat_messages"].append({
-            "role": "assistant",
+        st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+            "role": MESSAGE_ROLE_ASSISTANT,
             "content": answer,
         })
 

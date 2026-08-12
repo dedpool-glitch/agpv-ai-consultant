@@ -1,5 +1,13 @@
 from pathlib import Path
 
+from constants import (
+    BOOKS_COLLECTION_NAME,
+    PAPERS_COLLECTION_NAME,
+    RAG_SOURCE_BOOKS,
+    RAG_SOURCE_BOTH,
+    RAG_SOURCE_NONE,
+    RAG_SOURCE_PAPERS,
+)
 from rag.chunker import chunk_docling_document
 from rag.document_loader import load_pdf_document, load_pdfs_from_folder
 from rag.rag_answerer import answer_with_rag
@@ -87,14 +95,11 @@ def search_collection(collection_name, query, n_results=5, db_path=None):
     return format_query_results(results)
 
 
-PAPERS_COLLECTION_NAME = "ceed_group_papers"
-BOOKS_COLLECTION_NAME = "ceed_group_books"
-
 SOURCE_TO_COLLECTIONS = {
-    "papers": [PAPERS_COLLECTION_NAME],
-    "books": [BOOKS_COLLECTION_NAME],
-    "both": [PAPERS_COLLECTION_NAME, BOOKS_COLLECTION_NAME],
-    "none": [],
+    RAG_SOURCE_PAPERS: [PAPERS_COLLECTION_NAME],
+    RAG_SOURCE_BOOKS: [BOOKS_COLLECTION_NAME],
+    RAG_SOURCE_BOTH: [PAPERS_COLLECTION_NAME, BOOKS_COLLECTION_NAME],
+    RAG_SOURCE_NONE: [],
 }
 
 
