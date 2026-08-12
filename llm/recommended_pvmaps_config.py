@@ -24,7 +24,7 @@ def generate_recommended_pvmaps_config(
     api_key,
     user_profile=None,
     location_context=None,
-    consultation_history=None,
+    conversation_history=None,
     current_pvmaps_state=None,
     latest_user_message=None,
     retrieved_context=None,
@@ -39,7 +39,7 @@ def generate_recommended_pvmaps_config(
             "content": (
                 f"User profile:\n{json.dumps(user_profile, indent=2)}\n\n"
                 f"Location context:\n{json.dumps(location_context, indent=2)}\n\n"
-                f"Consultation history:\n{json.dumps(consultation_history, indent=2)}\n\n"
+                f"Conversation history:\n{json.dumps(conversation_history, indent=2)}\n\n"
                 f"Current PVMAPS state:\n{json.dumps(current_pvmaps_state, indent=2)}\n\n"
                 f"Latest user message:\n{json.dumps(latest_user_message)}\n\n"
                 f"Relevant research context:\n{context_text}\n\n"

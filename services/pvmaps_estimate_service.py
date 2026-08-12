@@ -1,5 +1,15 @@
 import copy
 
+from constants import (
+    MESSAGE_ROLE_ASSISTANT,
+    MESSAGE_TYPE_PVMAPS_RUN,
+    PVMAPS_SCRIPT_PATH,
+    RAG_SOURCE_BOTH,
+    SESSION_KEY_CHAT_MESSAGES,
+    SESSION_KEY_PVMAPS_RUNS,
+    SESSION_KEY_QUESTIONNAIRE_STATE,
+    SESSION_KEY_USER_PROFILE,
+)
 from llm.candidate_config_validator import validate_candidate_config
 from llm.output_generator import explain_output
 from llm.recommended_pvmaps_config import generate_recommended_pvmaps_config
@@ -19,12 +29,12 @@ def retrieve_recommendation_context(session_state, latest_user_message):
     """
     query = latest_user_message
     if not query:
-        user_profile = session_state.get("user_profile") or {}
+        user_profile = session_state.get(SESSION_KEY_USER_PROFILE) or {}
         goal = user_profile.get("project_goal", "solar farm design")
         query = f"PVMAPS solar farm design recommendations for {goal}"
 
     try:
-        return retrieve_for_source("both", query, n_results=2)
+        return retrieve_for_source(RAG_SOURCE_BOTH, query, n_results=2)
     except Exception:
         return []
 
@@ -37,7 +47,7 @@ def run_recommended_pvmaps_estimate(
     run_label=None,
 ):
     """
-    Run one PVMAPS solar-yield estimate and append it to session_state["pvmaps_runs"].
+    Run one PVMAPS solar-yield estimate and append it to session_state[SESSION_KEY_PVMAPS_RUNS].
 
     Can be called multiple times in one conversation. Any field changes for a
     variant run (e.g. trying tracking instead of fixed-tilt) are decided by
@@ -49,21 +59,21 @@ def run_recommended_pvmaps_estimate(
     lat = location_context.get("latitude")
     lon = location_context.get("longitude")
 
-    session_state.setdefault("chat_messages", [])
-    session_state.setdefault("pvmaps_runs", [])
+    session_state.setdefault(SESSION_KEY_CHAT_MESSAGES, [])
+    session_state.setdefault(SESSION_KEY_PVMAPS_RUNS, [])
 
     if lat is None or lon is None:
-        session_state["chat_messages"].append({
-            "role": "assistant",
+        session_state[SESSION_KEY_CHAT_MESSAGES].append({
+            "role": MESSAGE_ROLE_ASSISTANT,
             "content": "I can discuss agrivoltaics generally, but I need a site location before I can run a solar-yield estimate.",
         })
         return False
 
-    baseline_state = session_state.get("questionnaire_state") or initialize_questionnaire_state()
+    baseline_state = session_state.get(SESSION_KEY_QUESTIONNAIRE_STATE) or initialize_questionnaire_state()
     run_state = copy.deepcopy(baseline_state)
 
     conversation_history = {
-        "chat_messages": session_state.get("chat_messages", []),
+        SESSION_KEY_CHAT_MESSAGES: session_state.get(SESSION_KEY_CHAT_MESSAGES, []),
     }
 
     retrieved_context = retrieve_recommendation_context(session_state, latest_user_message)
@@ -80,9 +90,9 @@ def run_recommended_pvmaps_estimate(
 
     recommendation = generate_recommended_pvmaps_config(
         api_key,
-        user_profile=session_state.get("user_profile"),
+        user_profile=session_state.get(SESSION_KEY_USER_PROFILE),
         location_context=location_context,
-        consultation_history=conversation_history,
+        conversation_history=conversation_history,
         current_pvmaps_state=run_state,
         latest_user_message=latest_user_message,
         retrieved_context=retrieved_context,
@@ -92,7 +102,7 @@ def run_recommended_pvmaps_estimate(
         session_state,
         "recommended_pvmaps_config",
         input_summary={
-            "user_profile": session_state.get("user_profile"),
+            SESSION_KEY_USER_PROFILE: session_state.get(SESSION_KEY_USER_PROFILE),
             "location_context": location_context,
             "conversation_history": conversation_history,
             "current_pvmaps_state": run_state,
@@ -107,8 +117,8 @@ def run_recommended_pvmaps_estimate(
     )
 
     if recommendation_errors:
-        session_state["chat_messages"].append({
-            "role": "assistant",
+        session_state[SESSION_KEY_CHAT_MESSAGES].append({
+            "role": MESSAGE_ROLE_ASSISTANT,
             "content": "I tried to prepare a solar-yield estimate, but the recommended setup did not pass validation yet. I can still discuss the assumptions or ask a few setup questions.",
         })
         return False
@@ -139,13 +149,13 @@ def run_recommended_pvmaps_estimate(
     for field, value in newly_confirmed.items():
         if baseline_state.get(field) is None:
             update_questionnaire_state(baseline_state, field, value, assumed=True)
-    session_state["questionnaire_state"] = baseline_state
+    session_state[SESSION_KEY_QUESTIONNAIRE_STATE] = baseline_state
 
     pvmaps_input = build_pvmaps_input_from_questionnaire(run_state, lat, lon)
     errors = validate_pvmaps_input(pvmaps_input)
     if errors:
-        session_state["chat_messages"].append({
-            "role": "assistant",
+        session_state[SESSION_KEY_CHAT_MESSAGES].append({
+            "role": MESSAGE_ROLE_ASSISTANT,
             "content": "I prepared a solar-yield setup, but it failed input validation. The setup needs to be reviewed before running PVMAPS.",
         })
         add_llm_trace(
@@ -159,12 +169,12 @@ def run_recommended_pvmaps_estimate(
 
     output = run_pvmaps(
         pvmaps_input,
-        r"D:/agpv-ai-consultant/PV-MAPS-main"
+        PVMAPS_SCRIPT_PATH
     )
     explanation = explain_output(
         output,
         api_key,
-        session_state.get("user_profile"),
+        session_state.get(SESSION_KEY_USER_PROFILE),
     )
 
     run_record = {
@@ -174,14 +184,14 @@ def run_recommended_pvmaps_estimate(
         "explanation": explanation,
         "overrides": changed_fields,
     }
-    session_state["pvmaps_runs"].append(run_record)
-    session_state["chat_messages"].append({
-        "role": "assistant",
-        "type": "pvmaps_run",
-        "run_index": len(session_state["pvmaps_runs"]) - 1,
+    session_state[SESSION_KEY_PVMAPS_RUNS].append(run_record)
+    session_state[SESSION_KEY_CHAT_MESSAGES].append({
+        "role": MESSAGE_ROLE_ASSISTANT,
+        "type": MESSAGE_TYPE_PVMAPS_RUN,
+        "run_index": len(session_state[SESSION_KEY_PVMAPS_RUNS]) - 1,
     })
-    session_state["chat_messages"].append({
-        "role": "assistant",
+    session_state[SESSION_KEY_CHAT_MESSAGES].append({
+        "role": MESSAGE_ROLE_ASSISTANT,
         "content": explanation,
     })
     add_llm_trace(
