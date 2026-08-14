@@ -4,20 +4,7 @@ from constants import PVMAPS_FIELD_SCHEMA
 from llm.prompts import LLM_SYSTEM_RECOMMENDED_PVMAPS_CONFIG_PROMPT
 from llm.client import call_llm
 from llm.json_utils import parse_json_response
-
-
-def format_retrieved_context(retrieved_context):
-    if not retrieved_context:
-        return "None available."
-
-    context_blocks = []
-    for index, chunk in enumerate(retrieved_context, start=1):
-        metadata = chunk.get("metadata", {})
-        title = metadata.get("title", "Unknown source")
-        page = metadata.get("page", "unknown page")
-        context_blocks.append(f"Excerpt {index} ({title}, page {page}):\n{chunk['text']}")
-
-    return "\n---\n".join(context_blocks)
+from llm.rag_formatting import format_retrieved_context
 
 
 def generate_recommended_pvmaps_config(
