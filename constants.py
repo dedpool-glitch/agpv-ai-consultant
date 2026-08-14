@@ -324,3 +324,24 @@ PVMAPS_SCRIPT_PATH = r"D:/agpv-ai-consultant/PV-MAPS-main"
 # --- Environment ---
 GENAI_API_KEY_ENV_VAR = "PURDUE_GENAI_KEY"
 
+# --- App mode ---
+SESSION_KEY_APP_MODE = "app_mode"
+APP_MODE_NON_EXPERT = "non_expert"
+APP_MODE_EXPERT = "expert"
+
+EXPERT_MODE_TEXT = {
+    "mode_selector_header": "Choose a mode",
+    "mode_selector_description": "Pick how you want to use the assistant for this session.",
+    "non_expert_button": "Guided mode",
+    "non_expert_description": "Chat with the assistant, which will recommend PVMAPS parameters for you.",
+    "expert_button": "Expert mode",
+    "expert_description": "Manually set every PVMAPS parameter yourself, run the simulation, and review the output explanation.",
+    "switch_mode_button": "Switch mode",
+    "form_header": "Set PVMAPS parameters",
+    "run_button": "Run PVMAPS",
+    "missing_location_error": "Please confirm a site location before running PVMAPS.",
+    "validation_error_header": "Fix the following before running PVMAPS:",
+    "explanation_header": "Output explanation",
+    "simulation_error": "PVMAPS simulation failed.",
+}
+
