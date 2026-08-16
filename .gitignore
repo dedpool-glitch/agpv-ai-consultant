@@ -1,7 +1,5 @@
 __pycache__/
 *.py[cod]
-#ignore the PV-MAPS-main folder
-PV-MAPS-main/
 docs/progress.md
 tmp_mlx_media/
 .env

@@ -331,11 +331,10 @@ APP_MODE_EXPERT = "expert"
 
 EXPERT_MODE_TEXT = {
     "mode_selector_header": "Choose a mode",
-    "mode_selector_description": "Pick how you want to use the assistant for this session.",
     "non_expert_button": "Guided mode",
-    "non_expert_description": "Chat with the assistant, which will recommend PVMAPS parameters for you.",
+    "non_expert_description": "Chat with the AgPV Assistant.",
     "expert_button": "Expert mode",
-    "expert_description": "Manually set every PVMAPS parameter yourself, run the simulation, and review the output explanation.",
+    "expert_description": "Manually set PVMAPS params and run the simulation.",
     "switch_mode_button": "Switch mode",
     "form_header": "Set PVMAPS parameters",
     "run_button": "Run PVMAPS",

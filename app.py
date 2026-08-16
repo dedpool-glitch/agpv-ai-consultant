@@ -59,7 +59,6 @@ st.session_state.setdefault(SESSION_KEY_APP_MODE, None)
 
 if st.session_state[SESSION_KEY_APP_MODE] is None:
     st.subheader(EXPERT_MODE_TEXT["mode_selector_header"])
-    st.write(EXPERT_MODE_TEXT["mode_selector_description"])
     mode_col1, mode_col2 = st.columns(2)
     with mode_col1:
         st.write(EXPERT_MODE_TEXT["non_expert_description"])
