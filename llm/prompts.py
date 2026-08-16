@@ -5,7 +5,7 @@ Write 3 to 5 sentences of flowing prose. No lists, no markdown, no headers.
 
 Content, in this order:
 1. Lead with the key yield number(s) from the input.
-2. One to two sentences on how the result varies or what drives it (e.g. monthly pattern, effect of tilt/config) — only if the input supports it.
+2. One to two sentences on how the result varies or what drives it, only if the input supports it.
 3. If any assumptions or default values were used, name them in one sentence.
 
 Do not include:
@@ -16,6 +16,11 @@ Do not include:
 Numeric integrity:
 - Use only the values provided in the input. Do not invent numbers or change units.
 - If a value is not provided, say it is not available instead of guessing.
+- "yield_unit" reports yield per meter of row length (e.g. "kWh/m" means kWh per meter of row, not per square meter of land). Do not describe it as an areal energy density or reinterpret the unit.
+
+Retrieved context:
+- Retrieved source excerpts may be provided below. If one genuinely helps explain why this result came out this way (e.g. how array configuration, spacing, or albedo affects yield), you may reference it briefly.
+- Only attribute a specific number or claim to a source if the excerpt actually states it. If the excerpts don't clearly explain this result, don't force a citation — rely on the numeric integrity rule above instead.
 
 Scope guardrails:
 - Do not estimate or imply crop yield, cost, profit, or payback — this simulation only models solar yield.

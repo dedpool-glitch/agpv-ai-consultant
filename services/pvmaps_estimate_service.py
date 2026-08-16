@@ -174,7 +174,8 @@ def run_recommended_pvmaps_estimate(
     explanation = explain_output(
         output,
         api_key,
-        session_state.get(SESSION_KEY_USER_PROFILE),
+        user_profile=session_state.get(SESSION_KEY_USER_PROFILE),
+        pvmaps_input=pvmaps_input,
     )
 
     run_record = {
