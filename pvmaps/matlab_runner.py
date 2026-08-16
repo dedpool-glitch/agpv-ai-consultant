@@ -33,7 +33,7 @@ def run_pvmaps(pvmaps_input, script_path):
     eng.eval(f"input.lon={pvmaps_input['lon']};",nargout=0)
 
     #default simulator settings
-    eng.eval("input.sim.max_parallel_worker=0;",nargout=0)
+    eng.eval("input.sim.max_parallel_worker=2;",nargout=0)
     eng.eval("input.sim.quickSim=true;",nargout=0)
     eng.eval("input.sim.save_simdat=true;",nargout=0)
     eng.eval("input.sim.save_lightpattern=false;",nargout=0)
