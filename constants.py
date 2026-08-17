@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 REQUIRED_QUESTIONNAIRE_FIELDS = [
     "panel_model",
     "array_config",
@@ -319,11 +322,13 @@ SESSION_KEY_DATASHEET = "datasheet"
 SESSION_KEY_LLM_TRACE = "llm_trace"
 
 # --- PVMAPS model ---
-PVMAPS_SCRIPT_PATH = r"D:/agpv-ai-consultant/PV-MAPS-main"
+PROJECT_ROOT = Path(__file__).resolve().parent
+DATA_DIR = PROJECT_ROOT / "data"
+OUTPUT_DIR = PROJECT_ROOT / "outputs"
+PVMAPS_SCRIPT_PATH = str(PROJECT_ROOT / "models" / "pvmaps" / "bin" / "PV-MAPS-main")
 
 # --- Environment ---
 GENAI_API_KEY_ENV_VAR = "PURDUE_GENAI_KEY"
-
 # --- App mode ---
 SESSION_KEY_APP_MODE = "app_mode"
 APP_MODE_NON_EXPERT = "non_expert"

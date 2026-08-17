@@ -117,7 +117,7 @@
       }
     },
     "output": {
-      "_note": "Confirmed against a real `output` struct dump from simulate(). Fields below marked confidence:low are structurally confirmed (shape/dtype from the real dump) but their exact meaning is inferred, not verified against source -- treat with caution until confirmed against the .m source or Jabir. Only yearly_yield, monthly_yield, daily_yield, and yield_unit are currently extracted by pvmaps/matlab_runner.py; everything else here is present in the raw MATLAB struct but currently discarded by the Python wrapper.",
+      "_note": "Confirmed against a real `output` struct dump from simulate(). Fields below marked confidence:low are structurally confirmed (shape/dtype from the real dump) but their exact meaning is inferred, not verified against source -- treat with caution until confirmed against the .m source or Jabir. Only yearly_yield, monthly_yield, daily_yield, and yield_unit are currently extracted by models/pvmaps/matlab_runner.py; everything else here is present in the raw MATLAB struct but currently discarded by the Python wrapper.",
       "yearly_yield": {
         "def": null,
         "datatype": "number",
@@ -219,7 +219,7 @@
         "datatype": "string[]",
         "unit": null,
         "shape": "array, variable length",
-        "desc": "Not part of the raw MATLAB struct -- synthesized by pvmaps/matlab_runner.py, currently always hardcoded to empty. Confidence: high (about the wrapper's behavior, not about MATLAB).",
+        "desc": "Not part of the raw MATLAB struct -- synthesized by models/pvmaps/matlab_runner.py, currently always hardcoded to empty. Confidence: high (about the wrapper's behavior, not about MATLAB).",
         "bounds": null
       },
       "final_inputs": {
@@ -227,7 +227,7 @@
         "datatype": "object",
         "unit": null,
         "shape": "object with a fixed subset of keys: model, lat, lon, panel_type, tracking, tilt, pitch",
-        "desc": "Not part of the raw MATLAB struct -- built manually by pvmaps/matlab_runner.py as a partial echo of the inputs. Incomplete -- does not include albedo, azimuth, elevation, or gsHeight even though those were part of the input. Confidence: high (about the wrapper's behavior, not about MATLAB).",
+        "desc": "Not part of the raw MATLAB struct -- built manually by models/pvmaps/matlab_runner.py as a partial echo of the inputs. Incomplete -- does not include albedo, azimuth, elevation, or gsHeight even though those were part of the input. Confidence: high (about the wrapper's behavior, not about MATLAB).",
         "bounds": null
       }
     }

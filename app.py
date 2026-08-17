@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import os
 from dotenv import load_dotenv
 
+import traceback 
+
 from constants import (
     APP_TITLE,
     ARRAY_CONFIG_OPTIONS,
@@ -37,12 +39,14 @@ from constants import (
     TURN_TYPE_GATHER_INFO,
     TURN_TYPE_RUN_PVMAPS,
 )
+
+
 from services.location_geocoder import geocode_location
 from services.panel_specs import get_panel_models, get_panel_specs
 from llm.consultation_planner import route_conversation_turn
 from llm.general_agpv_answerer import answer_general_agpv_question
 from llm.rag_source_router import decide_rag_source
-from pvmaps.input_validator import validate_pvmaps_input
+from models.pvmaps.input_validator import validate_pvmaps_input
 from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
 from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
 from services.expert_estimate_service import run_expert_pvmaps_estimate
@@ -51,7 +55,8 @@ from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 
 load_dotenv()
 api_key = os.getenv(GENAI_API_KEY_ENV_VAR)
-
+if not api_key:
+    raise RuntimeError(f"{GENAI_API_KEY_ENV_VAR} is missing from the environment.")
 st.title(APP_TITLE)
 
 
@@ -171,6 +176,7 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                         "explanation": expert_explanation,
                     }
                 except Exception as error:
+                    
                     st.error(EXPERT_MODE_TEXT["simulation_error"])
                     add_llm_trace(
                         st.session_state,
@@ -179,6 +185,8 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                         output={"error": str(error)},
                         decision="expert_estimate_failed",
                     )
+                    
+                    st.error(traceback.format_exc())
 
     expert_last_run = st.session_state.get("expert_last_run")
     if expert_last_run:

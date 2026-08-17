@@ -13,8 +13,8 @@ from constants import (
 from llm.candidate_config_validator import validate_candidate_config
 from llm.output_generator import explain_output
 from llm.recommended_pvmaps_config import generate_recommended_pvmaps_config
-from pvmaps.input_validator import validate_pvmaps_input
-from pvmaps.matlab_runner import run_pvmaps
+from models.pvmaps.input_validator import validate_pvmaps_input
+from models.pvmaps.matlab_runner import run_pvmaps
 from questionnaire.state import initialize_questionnaire_state, update_questionnaire_state
 from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
 from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks

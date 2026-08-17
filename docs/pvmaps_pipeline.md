@@ -22,17 +22,17 @@ model construction, and execution.
 PVMAPS-related Python code now lives in:
 
 ```text
-pvmaps/
+models/pvmaps/
 ```
 
 Files:
 
 ```text
-pvmaps/input_builder.py
-pvmaps/input_validator.py
-pvmaps/mock_runner.py
-pvmaps/matlab_runner.py
-pvmaps/result_explainer.py
+models/pvmaps/input_builder.py
+models/pvmaps/input_validator.py
+models/pvmaps/mock_runner.py
+models/pvmaps/matlab_runner.py
+models/pvmaps/result_explainer.py
 ```
 
 ## Main Flow
@@ -85,7 +85,7 @@ audit notes, not scientific sources.
 File:
 
 ```text
-pvmaps/input_builder.py
+models/pvmaps/input_builder.py
 ```
 
 Defines:
@@ -101,7 +101,7 @@ Creates a nested Python dictionary that mirrors the MATLAB PVMAPS input struct.
 File:
 
 ```text
-pvmaps/input_validator.py
+models/pvmaps/input_validator.py
 ```
 
 Defines:
@@ -141,7 +141,7 @@ Current azimuth assumption:
 File:
 
 ```text
-pvmaps/mock_runner.py
+models/pvmaps/mock_runner.py
 ```
 
 Returns mock PVMAPS output shaped like the real MATLAB output.
@@ -157,7 +157,7 @@ test pipeline behavior without launching MATLAB
 File:
 
 ```text
-pvmaps/matlab_runner.py
+models/pvmaps/matlab_runner.py
 ```
 
 Defines:
@@ -181,7 +181,7 @@ return Python dictionary
 Important path:
 
 ```text
-script_path = D:/agpv-ai-consultant/PV-MAPS-main
+script_path = models/pvmaps/bin/PV-MAPS-main
 ```
 
 ## Result Explainer
@@ -189,7 +189,7 @@ script_path = D:/agpv-ai-consultant/PV-MAPS-main
 File:
 
 ```text
-pvmaps/result_explainer.py
+models/pvmaps/result_explainer.py
 ```
 
 Turns PVMAPS output into readable text using:

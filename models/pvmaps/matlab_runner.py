@@ -1,16 +1,26 @@
-import matlab.engine 
+import matlab.engine
 import os
+from pathlib import Path
+
 
 def run_pvmaps(pvmaps_input, script_path):
+    script_path = Path(script_path).resolve()
+    
+    # Check for the proper path 
+    if not script_path.is_dir():
+        raise FileNotFoundError(f"PVMAPS folder does not exist: {script_path}")
+
     eng = matlab.engine.start_matlab()
-    script_path = os.path.normpath(script_path)
+
+    script_path = os.path.normpath(str(script_path))
     pvmaps_path = os.path.join(script_path, "pvmaps")
     eng.cd(script_path, nargout=0)
     eng.addpath(pvmaps_path, nargout=0)
     eng.addpath(os.path.join(pvmaps_path, "data"), nargout=0)
     eng.addpath(os.path.join(pvmaps_path, "lib", "textprogressbar"), nargout=0)
     eng.addpath(os.path.join(pvmaps_path, "lib", "PVLIB_Matlab-master", "PVLIB"), nargout=0)
-        
+    
+
     eng.eval("input=initiate();",nargout=0)
     #input module fields(properties of a single solar panel)
     eng.eval(f"input.module.cell_tech='{pvmaps_input['module']['cell_tech']}';",nargout=0)

@@ -51,7 +51,7 @@ user profile and optional site location
 
 ```text
 app.py          Streamlit application entry point
-pvmaps/         PVMAPS input builders, validators, runner, and output handling
+models/pvmaps/  PVMAPS input builders, validators, runner, and bundled runtime
 questionnaire/  questionnaire state, parsing, and PVMAPS conversion helpers
 llm/            LLM client, prompts, extraction, questions, and candidate config
 services/       geocoding, panel specs, NASA lookup, reporting, and app services

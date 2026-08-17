@@ -1,11 +1,11 @@
 import csv
 from datetime import datetime
-from pathlib import Path
 
+from constants import OUTPUT_DIR
 from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
 
 
-EXPERT_EVAL_LOG_PATH = Path(r"D:\agpv-ai-consultant\outputs\expert_mode_explainer_eval_log.csv")
+EXPERT_EVAL_LOG_PATH = OUTPUT_DIR / "expert_mode_explainer_eval_log.csv"
 
 LOG_FIELDNAMES = [
     "timestamp", "lat", "lon", "panel_model", "cell_tech", "array_config",
