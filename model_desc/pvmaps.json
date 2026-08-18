@@ -1,0 +1,626 @@
+{
+  "schema_version": "1.0",
+
+  "model": {
+    "id": "pvmaps",
+    "name": "Purdue Modeling and Analaysis of PV systems (PVMAPS)",
+    "version": "1.0.0",
+    "description": "Purdue Modeling and Analaysis of PV systems (PVMAPS) is a solar farm simulator. ",
+    "author": "Purdue CEED Lab", 
+    "url": "https://github.com/CEEDAnalytics/PV-MAPS"
+  },
+
+  "inputs": [
+    {
+      "id": "module.cell_tech",
+      "name": "Cell Technology",
+      "description": "Photovoltaic cell technology used in the module.",
+      "physical_quantity": null,
+      "value_type": "scalar",
+      "element_type": "string",
+      "unit": null,
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "allowed_values": [
+          "AL_BSF",
+          "BI_PERC",
+          "SHJ",
+          "PVK_SI_2T",
+          "PVK_SI_4T",
+          "SHJ_NN"
+        ]
+      },
+      "required": true,
+      "default": "AL_BSF",
+      "metadata": {}
+    },
+
+    {
+      "id": "module.height",
+      "name": "Module Height",
+      "description": "Physical height of the photovoltaic module. Width of each PV row in the system.",
+      "physical_quantity": "length",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "m",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": null
+      },
+      "required": true,
+      "default": 4.8,
+      "metadata": {}
+    },
+
+    {
+      "id": "module.stc_eff.direct",
+      "name": "Direct Collection Efficiency",
+      "description": "Module conversion efficiency for direct irradiance under STC.",
+      "physical_quantity": "efficiency",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "%",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": 100
+      },
+      "required": true,
+      "default": 21.8,
+      "metadata": {}
+    },
+
+    {
+      "id": "module.stc_eff.diffuse",
+      "name": "Diffuse Collection Efficiency",
+      "description": "Module conversion efficiency for diffuse irradiance under STC.",
+      "physical_quantity": "efficiency",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "%",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": 100
+      },
+      "required": true,
+      "default": 21.8,
+      "metadata": {}
+    },
+
+    {
+      "id": "module.tcoeff",
+      "name": "Module Power Temperature Coefficient",
+      "description": "Relative change in module power per unit change in temperature.",
+      "physical_quantity": "temperature_coefficient",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "1/K",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {},
+      "required": true,
+      "default": 0.0041,
+      "metadata": {}
+    },
+
+    {
+      "id": "array.config",
+      "name": "Array Configuration",
+      "description": "Photovoltaic array mounting or tracking configuration.",
+      "physical_quantity": null,
+      "value_type": "scalar",
+      "element_type": "string",
+      "unit": null,
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "allowed_values": [
+          "fixed",
+          "tracking",
+          "GSVBF"
+        ]
+      },
+      "required": true,
+      "default": "tracking",
+      "metadata": {}
+    },
+
+    {
+      "id": "array.tilt",
+      "name": "Array Tilt",
+      "description": "Tilt angle of the photovoltaic array.",
+      "physical_quantity": "angle",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "degree",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": 90
+      },
+      "required": true,
+      "default": 25,
+      "metadata": {}
+    },
+
+    {
+      "id": "array.azimuth",
+      "name": "Array Azimuth",
+      "description": "Array azimuth angle.",
+      "physical_quantity": "angle",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "degree",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": 360
+      },
+      "required": true,
+      "default": 90,
+      "metadata": {}
+    },
+
+    {
+      "id": "array.albedo",
+      "name": "Ground Albedo",
+      "description": "Fraction of incident irradiance reflected by the ground.",
+      "physical_quantity": "dimensionless",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "1",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": 1
+      },
+      "required": true,
+      "default": 0.3,
+      "metadata": {}
+    },
+
+    {
+      "id": "array.pitch",
+      "name": "Array Pitch",
+      "description": "Distance between adjacent photovoltaic rows.",
+      "physical_quantity": "length",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "m",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": null
+      },
+      "required": true,
+      "default": 11,
+      "metadata": {}
+    },
+
+    {
+      "id": "array.gsHeight",
+      "name": "Ground Sculpture Height",
+      "description": "Ground-sculpting height parameter. Only used when simulating GSVBF systmes. Refer to the paper by Khan et al.",
+      "physical_quantity": "length",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "m",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": null
+      },
+      "required": false,
+      "default": 0.5,
+      "metadata": {}
+    },
+
+    {
+      "id": "array.elevation",
+      "name": "Array Elevation",
+      "description": "Elevation of the photovoltaic array above ground.",
+      "physical_quantity": "length",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "m",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": null
+      },
+      "required": true,
+      "default": 3,
+      "metadata": {}
+    },
+
+    {
+      "id": "lat",
+      "name": "Latitude",
+      "description": "Latitude of the solar farm.",
+      "physical_quantity": "angle",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "degree",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": -90,
+        "max": 90
+      },
+      "required": true,
+      "default": 32.692,
+      "metadata": {}
+    },
+
+    {
+      "id": "lon",
+      "name": "Longitude",
+      "description": "Longitude of the solar farm.",
+      "physical_quantity": "angle",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "degree",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": -180,
+        "max": 180
+      },
+      "required": true,
+      "default": -114.627,
+      "metadata": {}
+    },
+
+    {
+      "id": "sim.max_parallel_worker",
+      "name": "Maximum Parallel Workers",
+      "description": "Maximum number of parallel workers. Zero indicates single-core execution.",
+      "physical_quantity": null,
+      "value_type": "scalar",
+      "element_type": "integer",
+      "unit": null,
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": null
+      },
+      "required": false,
+      "default": 0,
+      "metadata": {}
+    },
+
+    {
+      "id": "sim.quickSim",
+      "name": "Quick Simulation",
+      "description": "Enables reduced-duration simulation mode.",
+      "physical_quantity": null,
+      "value_type": "scalar",
+      "element_type": "boolean",
+      "unit": null,
+      "shape": [],
+      "dimensions": {},
+      "constraints": {},
+      "required": false,
+      "default": true,
+      "metadata": {}
+    },
+
+    {
+      "id": "sim.save_simdat",
+      "name": "Save Simulation Data",
+      "description": "Save detailed simulation results and intermediate data.",
+      "physical_quantity": null,
+      "value_type": "scalar",
+      "element_type": "boolean",
+      "unit": null,
+      "shape": [],
+      "dimensions": {},
+      "constraints": {},
+      "required": false,
+      "default": true,
+      "metadata": {}
+    },
+
+    {
+      "id": "sim.save_lightpattern",
+      "name": "Save Light Pattern",
+      "description": "Save the ground irradiance map between photovoltaic rows.",
+      "physical_quantity": null,
+      "value_type": "scalar",
+      "element_type": "boolean",
+      "unit": null,
+      "shape": [],
+      "dimensions": {},
+      "constraints": {},
+      "required": false,
+      "default": false,
+      "metadata": {}
+    }
+  ],
+
+  "outputs": [
+    {
+      "id": "time",
+      "name": "Simulation Time",
+      "description": "Simulation time values for each simulation block.",
+      "physical_quantity": "time",
+      "value_type": "array",
+      "element_type": "float",
+      "unit": "h",
+      "shape": [
+        "simulation_block",
+        "time"
+      ],
+      "dimensions": {
+        "simulation_block": {
+          "size": 12,
+          "unit": null,
+          "description": "Outer simulation grouping; currently represented by 12 blocks."
+        },
+        "time": {
+          "size": null,
+          "unit": "h",
+          "description": "Time samples within each simulation block."
+        }
+      },
+      "constraints": {},
+      "required": null,
+      "default": null,
+      "metadata": {}
+    },
+
+    {
+      "id": "opt_tracking_angle",
+      "name": "Optimal Tracking Angle",
+      "description": "Optimal tracking angle as a function of simulation block and time.",
+      "physical_quantity": "angle",
+      "value_type": "array",
+      "element_type": "float",
+      "unit": "degree",
+      "shape": [
+        "simulation_block",
+        "time"
+      ],
+      "dimensions": {
+        "simulation_block": {
+          "size": 12,
+          "unit": null
+        },
+        "time": {
+          "size": null,
+          "unit": "h"
+        }
+      },
+      "constraints": {},
+      "required": null,
+      "default": null,
+      "metadata": {}
+    },
+
+    {
+      "id": "opt_power",
+      "name": "Optimal Power",
+      "description": "Optimal photovoltaic power output.",
+      "physical_quantity": "power",
+      "value_type": "array",
+      "element_type": "float",
+      "unit": null,
+      "shape": [
+        "simulation_block",
+        "time"
+      ],
+      "dimensions": {
+        "simulation_block": {
+          "size": 12,
+          "unit": null
+        },
+        "time": {
+          "size": null,
+          "unit": "h"
+        }
+      },
+      "constraints": {},
+      "required": null,
+      "default": null,
+      "metadata": {}
+    },
+
+    {
+      "id": "opt_p",
+      "name": "Optimal Pitch",
+      "description": "Optimal simulated pitch.",
+      "physical_quantity": null,
+      "value_type": "array",
+      "element_type": "float",
+      "unit": null,
+      "shape": [
+        "simulation_block",
+        "time"
+      ],
+      "dimensions": {
+        "simulation_block": {
+          "size": 12,
+          "unit": null
+        },
+        "time": {
+          "size": null,
+          "unit": null
+        }
+      },
+      "constraints": {},
+      "required": null,
+      "default": null,
+      "metadata": {}
+    },
+
+    {
+      "id": "solarnoon",
+      "name": "Solar Noon",
+      "description": "Solar noon value for each simulation block.",
+      "physical_quantity": "time",
+      "value_type": "array",
+      "element_type": "float",
+      "unit": "h",
+      "shape": [
+        "simulation_block"
+      ],
+      "dimensions": {
+        "simulation_block": {
+          "size": 12,
+          "unit": null
+        }
+      },
+      "constraints": {},
+      "required": null,
+      "default": null,
+      "metadata": {}
+    },
+
+    {
+      "id": "yearly_yield",
+      "name": "Yearly Yield",
+      "description": "Total yearly photovoltaic yield.",
+      "physical_quantity": "energy_yield",
+      "value_type": "scalar",
+      "element_type": "float",
+      "unit": "kWh/m",
+      "shape": [],
+      "dimensions": {},
+      "constraints": {
+        "min": 0,
+        "max": null
+      },
+      "required": null,
+      "default": null,
+      "metadata": {}
+    },
+
+    {
+      "id": "monthly_yield",
+      "name": "Monthly Yield",
+      "description": "Photovoltaic yield for each simulation block.",
+      "physical_quantity": "energy_yield",
+      "value_type": "array",
+      "element_type": "float",
+      "unit": "kWh/m",
+      "shape": [
+        "simulation_block"
+      ],
+      "dimensions": {
+        "simulation_block": {
+          "size": 12,
+          "unit": null
+        }
+      },
+      "constraints": {
+        "min": 0,
+        "max": null
+      },
+      "required": null,
+      "default": null,
+      "metadata": {}
+    },
+
+    {
+      "id": "daily_yield",
+      "name": "Daily Yield",
+      "description": "Daily photovoltaic yield associated with each simulation block.",
+      "physical_quantity": "energy_yield",
+      "value_type": "array",
+      "element_type": "float",
+      "unit": "kWh/m",
+      "shape": [
+        "simulation_block"
+      ],
+      "dimensions": {
+        "simulation_block": {
+          "size": 12,
+          "unit": null
+        }
+      },
+      "constraints": {
+        "min": 0,
+        "max": null
+      },
+      "required": null,
+      "default": null,
+      "metadata": {}
+    },
+
+    {
+      "id": "yield_unit",
+      "name": "Yield Unit",
+      "description": "Unit string associated with the reported yield quantities.",
+      "physical_quantity": null,
+      "value_type": "scalar",
+      "element_type": "string",
+      "unit": null,
+      "shape": [],
+      "dimensions": {},
+      "constraints": {},
+      "required": null,
+      "default": "kWh/m",
+      "metadata": {}
+    },
+
+    {
+      "id": "simdat",
+      "name": "Simulation Data",
+      "description": "Detailed simulation results and intermediate data.",
+      "physical_quantity": null,
+      "value_type": "object_array",
+      "element_type": "object",
+      "unit": null,
+      "shape": [
+        "simulation_block"
+      ],
+      "dimensions": {
+        "simulation_block": {
+          "size": 12,
+          "unit": null
+        }
+      },
+      "constraints": {},
+      "required": null,
+      "default": null,
+      "metadata": {}
+    },
+
+    {
+      "id": "power_mat",
+      "name": "Power Matrix",
+      "description": "Detailed power-related simulation output.",
+      "physical_quantity": "power",
+      "value_type": "array",
+      "element_type": "float",
+      "unit": null,
+      "shape": [
+        "simulation_block",
+        "..."
+      ],
+      "dimensions": {
+        "simulation_block": {
+          "size": 12,
+          "unit": null
+        }
+      },
+      "constraints": {},
+      "required": null,
+      "default": null,
+      "metadata": {}
+    }
+  ]
+}

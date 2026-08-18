@@ -42,21 +42,25 @@ def run_pvmaps(pvmaps_input, script_path):
     eng.eval(f"input.lat={pvmaps_input['lat']};",nargout=0)  #resemlbes writing code in MATLAB
     eng.eval(f"input.lon={pvmaps_input['lon']};",nargout=0)
 
-    #default simulator settings
-    eng.eval("input.sim.max_parallel_worker=2;",nargout=0)
-    eng.eval("input.sim.quickSim=true;",nargout=0)
-    eng.eval("input.sim.save_simdat=true;",nargout=0)
-    eng.eval("input.sim.save_lightpattern=false;",nargout=0)
+    # Simulator settings supplied by the descriptor-driven input form.
+    sim = pvmaps_input["sim"]
+    eng.eval(f"input.sim.max_parallel_worker={sim['max_parallel_worker']};", nargout=0)
+    eng.eval(f"input.sim.quickSim={str(bool(sim['quickSim'])).lower()};", nargout=0)
+    eng.eval(f"input.sim.save_simdat={str(bool(sim['save_simdat'])).lower()};", nargout=0)
+    eng.eval(
+        f"input.sim.save_lightpattern={str(bool(sim['save_lightpattern'])).lower()};",
+        nargout=0,
+    )
 
     #run the simulation
     pvmaps_output = eng.simulate(eng.workspace["input"],nargout=1) #call function simulate with input.
-
+    warnings = []
     return {
         "yearly_yield": float(pvmaps_output["yearly_yield"]),
         "monthly_yield": list(pvmaps_output["monthly_yield"][0]),
         "daily_yield": list(pvmaps_output["daily_yield"][0]),
         "yield_unit": str(pvmaps_output["yield_unit"]),
-        "warnings": [],
+        "warnings": warnings,
         "final_inputs": {
             "model": "PVMAPS",
             "lat": pvmaps_input["lat"],
