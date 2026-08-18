@@ -1,8 +1,11 @@
+from pathlib import Path
+
 from constants import PAPERS_COLLECTION_NAME
 from rag.pipeline import build_collection_from_path, search_collection
 
 
-RESOURCE_FOLDER = r"D:\agpv-ai-consultant\resources"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+RESOURCE_FOLDER = PROJECT_ROOT / "resources"
 COLLECTION_NAME = PAPERS_COLLECTION_NAME
 
 

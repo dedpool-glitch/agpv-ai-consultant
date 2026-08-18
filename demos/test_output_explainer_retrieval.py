@@ -25,12 +25,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from llm.output_generator import explain_output
-from pvmaps.input_builder import create_default_pvmaps_input
-from pvmaps.mock_runner import run_mock_pvmaps
+from models.pvmaps.input_builder import create_default_pvmaps_input
+from models.pvmaps.mock_runner import run_mock_pvmaps
 from rag.pipeline import retrieve_for_source
 
 
-OUTPUT_PATH = Path(r"D:\agpv-ai-consultant\outputs\output_explainer_retrieval_results.csv")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+OUTPUT_PATH = PROJECT_ROOT / "outputs" / "output_explainer_retrieval_results.csv"
 
 # A fixed test location so results are comparable across runs.
 TEST_LAT = 40.42

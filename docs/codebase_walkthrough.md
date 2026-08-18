@@ -110,13 +110,13 @@ estimate or a clear failure." In order:
      resolves panel specs (via `services/panel_specs.py`, or hardcoded defaults if
      `panel_model == "default values"`) and shapes everything into the nested dict
      PVMAPS itself expects (`module.*`, `array.*`, `lat`, `lon`).
-   - `pvmaps/input_validator.py -> validate_pvmaps_input(pvmaps_input)` runs a second,
+   - `models/pvmaps/input_validator.py -> validate_pvmaps_input(pvmaps_input)` runs a second,
      independent set of checks — physical/numeric bounds this time (efficiency
      ranges, tilt range, albedo range, the `elevation > module height / 2` clearance
      rule), not the LLM-facing field checks from step 4. **This is the deliberate
      "don't trust the LLM, verify the physics" gate** — the whole reason a
      conversational LLM is allowed anywhere near a MATLAB simulator at all.
-   - If that passes: `pvmaps/matlab_runner.py -> run_pvmaps(pvmaps_input, script_path)`
+   - If that passes: `models/pvmaps/matlab_runner.py -> run_pvmaps(pvmaps_input, script_path)`
      starts a MATLAB engine, pushes every field into a MATLAB `input` struct via
      `eng.eval(...)`, and calls the actual `simulate()` function from the PVMAPS
      MATLAB codebase, returning yearly/monthly/daily yield.
@@ -156,4 +156,4 @@ shaped LLM responses) is a discrete next task, not something this walkthrough co
 Before moving to any other file in the repo, try narrating steps 1 through 4 above out
 loud, from memory, using only function names (not this document). Then pick one thing
 you got fuzzy on and go reread *only* that file. That's a better use of an hour than
-reading every file in `services/` and `pvmaps/` in alphabetical order.
+reading every file in `services/` and `models/pvmaps/` in alphabetical order.

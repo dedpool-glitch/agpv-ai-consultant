@@ -4,9 +4,9 @@ from questionnaire.state import (
     apply_questionnaire_defaults,
 )
 from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
-from pvmaps.input_validator import validate_pvmaps_input
-from pvmaps.mock_runner import run_mock_pvmaps
-from pvmaps.result_explainer import explain_pvmaps_result
+from models.pvmaps.input_validator import validate_pvmaps_input
+from models.pvmaps.mock_runner import run_mock_pvmaps
+from models.pvmaps.result_explainer import explain_pvmaps_result
 
 state = initialize_questionnaire_state()
 

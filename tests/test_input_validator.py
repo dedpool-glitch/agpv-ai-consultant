@@ -1,5 +1,5 @@
-from pvmaps.input_builder import create_default_pvmaps_input
-from pvmaps.input_validator import validate_pvmaps_input
+from models.pvmaps.input_builder import create_default_pvmaps_input
+from models.pvmaps.input_validator import validate_pvmaps_input
 from constants import PVMAPS_VALIDATION_MESSAGES
 
 

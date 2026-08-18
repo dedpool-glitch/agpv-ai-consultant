@@ -13,6 +13,10 @@ def create_default_pvmaps_input(
     pitch=11.0,
     gs_height=0.5,
     array_elevation=3.0,
+    max_parallel_worker=0,
+    quick_sim=True,
+    save_simdat=True,
+    save_lightpattern=False,
 ):
     return {
         "lat": lat,
@@ -34,5 +38,11 @@ def create_default_pvmaps_input(
             "pitch": pitch,
             "gsHeight": gs_height,
             "elevation": array_elevation,
+        },
+        "sim": {
+            "max_parallel_worker": max_parallel_worker,
+            "quickSim": quick_sim,
+            "save_simdat": save_simdat,
+            "save_lightpattern": save_lightpattern,
         },
     }

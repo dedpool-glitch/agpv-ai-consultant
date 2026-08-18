@@ -1,18 +1,17 @@
 import streamlit as st
 import matplotlib.pyplot as plt
+import json
 import os
 from dotenv import load_dotenv
 
+import traceback 
+
 from constants import (
     APP_TITLE,
-    ARRAY_CONFIG_OPTIONS,
     LOCATION_TEXT,
-    MANUAL_INPUT_TEXT,
     MONTH_LABELS,
     CHAT_UI_TEXT,
     EXPERT_MODE_TEXT,
-    PVMAPS_VALIDATION_LIMITS,
-    PVMAPS_VALIDATION_MESSAGES,
     RESULT_TEXT,
     USER_PROFILE_TEXT,
     USER_TYPE_OPTIONS,
@@ -37,13 +36,17 @@ from constants import (
     TURN_TYPE_GATHER_INFO,
     TURN_TYPE_RUN_PVMAPS,
 )
+
+
 from services.location_geocoder import geocode_location
-from services.panel_specs import get_panel_models, get_panel_specs
 from llm.consultation_planner import route_conversation_turn
 from llm.general_agpv_answerer import answer_general_agpv_question
 from llm.rag_source_router import decide_rag_source
-from pvmaps.input_validator import validate_pvmaps_input
-from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
+from models.pvmaps.descriptor import (
+    build_pvmaps_input_from_descriptor_values,
+    get_pvmaps_input_descriptors,
+    validate_pvmaps_descriptor_input,
+)
 from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
 from services.expert_estimate_service import run_expert_pvmaps_estimate
 from services.llm_trace import add_llm_trace
@@ -51,8 +54,64 @@ from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 
 load_dotenv()
 api_key = os.getenv(GENAI_API_KEY_ENV_VAR)
-
+if not api_key:
+    raise RuntimeError(f"{GENAI_API_KEY_ENV_VAR} is missing from the environment.")
+st.set_page_config(layout="wide")
 st.title(APP_TITLE)
+
+
+def _descriptor_label(field):
+    unit = field.get("unit")
+    return f"{field['name']} ({unit})" if unit and unit != "1" else field["name"]
+
+# Render the forms based on model description provided in pvmaps.json 
+def _render_descriptor_input(field, container=st):
+    constraints = field.get("constraints") or {}
+    metadata = field.get("metadata") or {}
+    allowed_values = constraints.get("allowed_values")
+    label = _descriptor_label(field)
+    help_text = field.get("description") or None
+    default = field.get("default")
+
+    if allowed_values:
+        default_index = allowed_values.index(default) if default in allowed_values else 0
+        return container.selectbox(
+            label,
+            options=allowed_values,
+            index=default_index,
+            help=help_text,
+            key=f"expert_{field['id']}",
+        )
+
+    if field.get("element_type") == "boolean":
+        return container.checkbox(
+            label,
+            value=bool(default),
+            help=help_text,
+            key=f"expert_{field['id']}",
+        )
+
+    number_type = int if field.get("element_type") == "integer" else float
+    step = number_type(
+        metadata.get("step", 1 if field.get("element_type") == "integer" else 0.1)
+    )
+    number_options = {
+        "label": label,
+        "value": number_type(default),
+        "step": step,
+        "help": help_text,
+        "key": f"expert_{field['id']}",
+    }
+    if metadata.get("format"):
+        number_options["format"] = metadata["format"]
+    if constraints.get("min") is not None:
+        minimum = number_type(constraints["min"])
+        number_options["min_value"] = (
+            minimum + step if constraints.get("exclusive_min") else minimum
+        )
+    if constraints.get("max") is not None:
+        number_options["max_value"] = number_type(constraints["max"])
+    return container.number_input(**number_options)
 
 
 st.session_state.setdefault(SESSION_KEY_APP_MODE, None)
@@ -76,123 +135,73 @@ with st.sidebar:
     if st.button(EXPERT_MODE_TEXT["switch_mode_button"]):
         st.session_state[SESSION_KEY_APP_MODE] = None
         st.rerun()
-
+        
+# Expert mode interface 
 if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
     st.subheader(EXPERT_MODE_TEXT["form_header"])
+    input_column, result_column = st.columns([1, 1.25], gap="large")
 
-    expert_site_location = st.text_input(LOCATION_TEXT["input_label"], key="expert_site_location")
-    if st.button(LOCATION_TEXT["geocode_button"], key="expert_geocode_button"):
-        try:
-            expert_coordinates = geocode_location(expert_site_location)
-            st.session_state["expert_location_context"] = {
-                "site_location": expert_site_location,
-                "confirmed_address": expert_coordinates["address"],
-                "latitude": expert_coordinates["latitude"],
-                "longitude": expert_coordinates["longitude"],
-            }
-        except Exception:
-            st.session_state["expert_location_context"] = None
-            st.error(LOCATION_TEXT["geocode_error"])
+    expert_form_values = {}
+    current_group = None
+    for field in get_pvmaps_input_descriptors():
+        field_group = field["id"].split(".", 1)[0] if "." in field["id"] else "location"
+        if field_group != current_group:
+            current_group = field_group
+            input_column.markdown(f"### {field_group.replace('_', ' ').title()}")
+        expert_form_values[field["id"]] = _render_descriptor_input(
+            field, input_column
+        )
 
-    expert_location_context = st.session_state.get("expert_location_context")
-    if expert_location_context:
-        st.success(f"Using location: {expert_location_context['confirmed_address']}")
+    if input_column.button(EXPERT_MODE_TEXT["run_button"]):
+        expert_pvmaps_input = build_pvmaps_input_from_descriptor_values(
+            expert_form_values
+        )
+        input_column.subheader("PVMAPS input")
+        input_column.json(expert_pvmaps_input)
+        print("PVMAPS input:\n" + json.dumps(expert_pvmaps_input, indent=2))
 
-    panel_model_options = [MANUAL_INPUT_TEXT["default_panel_model"]] + get_panel_models()
-    expert_panel_model = st.selectbox(MANUAL_INPUT_TEXT["panel_model_label"], options=panel_model_options)
-
-    if expert_panel_model == MANUAL_INPUT_TEXT["default_panel_model"]:
-        expert_module_height = 4.8
-    else:
-        expert_module_height = get_panel_specs(expert_panel_model)["module_height"]
-
-    expert_array_config = st.selectbox(MANUAL_INPUT_TEXT["array_config_label"], options=ARRAY_CONFIG_OPTIONS)
-
-    expert_tilt = st.number_input(MANUAL_INPUT_TEXT["tilt_label"], value=25.0, step=1.0)
-    if not (PVMAPS_VALIDATION_LIMITS["tilt_min"] <= expert_tilt <= PVMAPS_VALIDATION_LIMITS["tilt_max"]):
-        st.error(PVMAPS_VALIDATION_MESSAGES["tilt_range"])
-
-    expert_azimuth = st.selectbox(
-        MANUAL_INPUT_TEXT["azimuth_label"],
-        options=[PVMAPS_VALIDATION_LIMITS["azimuth_ew"], PVMAPS_VALIDATION_LIMITS["azimuth_ns"]],
-        help="90 = east-west, 180 = north-south",
-    )
-
-    expert_albedo = st.number_input(MANUAL_INPUT_TEXT["albedo_label"], value=0.3, step=0.05, format="%.2f")
-    if not (PVMAPS_VALIDATION_LIMITS["albedo_min"] <= expert_albedo <= PVMAPS_VALIDATION_LIMITS["albedo_max"]):
-        st.error(PVMAPS_VALIDATION_MESSAGES["albedo_range"])
-
-    expert_pitch = st.number_input(MANUAL_INPUT_TEXT["pitch_label"], value=11.0, step=0.5)
-    if expert_pitch <= 0:
-        st.error(PVMAPS_VALIDATION_MESSAGES["pitch_positive"])
-
-    expert_gs_height = st.number_input(MANUAL_INPUT_TEXT["ground_sculpting_height_label"], value=0.5, step=0.1)
-    if expert_gs_height < 0:
-        st.error(PVMAPS_VALIDATION_MESSAGES["gs_height_nonnegative"])
-
-    expert_array_elevation = st.number_input(MANUAL_INPUT_TEXT["elevation_label"], value=3.0, step=0.5)
-    if expert_array_elevation < 0:
-        st.error(PVMAPS_VALIDATION_MESSAGES["array_elevation_nonnegative"])
-    elif expert_array_elevation <= expert_module_height / 2:
-        st.error(PVMAPS_VALIDATION_MESSAGES["array_elevation_height_relation"])
-
-    if st.button(EXPERT_MODE_TEXT["run_button"]):
-        if not expert_location_context:
-            st.error(EXPERT_MODE_TEXT["missing_location_error"])
+        expert_errors = validate_pvmaps_descriptor_input(expert_pvmaps_input)
+        if expert_errors:
+            input_column.error(EXPERT_MODE_TEXT["validation_error_header"])
+            for expert_error in expert_errors:
+                input_column.write(f"- {expert_error}")
         else:
-            expert_questionnaire_state = {
-                "panel_model": expert_panel_model,
-                "array_config": expert_array_config,
-                "tilt": expert_tilt,
-                "azimuth": expert_azimuth,
-                "albedo": expert_albedo,
-                "pitch": expert_pitch,
-                "gs_height": expert_gs_height,
-                "array_elevation": expert_array_elevation,
-            }
-            expert_pvmaps_input = build_pvmaps_input_from_questionnaire(
-                expert_questionnaire_state,
-                expert_location_context["latitude"],
-                expert_location_context["longitude"],
-            )
-            expert_errors = validate_pvmaps_input(expert_pvmaps_input)
-            if expert_errors:
-                st.error(EXPERT_MODE_TEXT["validation_error_header"])
-                for expert_error in expert_errors:
-                    st.write(f"- {expert_error}")
-            else:
-                try:
-                    expert_output, expert_explanation = run_expert_pvmaps_estimate(
-                        st.session_state, expert_pvmaps_input, api_key
-                    )
-                    st.session_state["expert_last_run"] = {
-                        "input": expert_pvmaps_input,
-                        "output": expert_output,
-                        "explanation": expert_explanation,
-                    }
-                except Exception as error:
-                    st.error(EXPERT_MODE_TEXT["simulation_error"])
-                    add_llm_trace(
-                        st.session_state,
-                        "expert_mode_pvmaps_run",
-                        input_summary={"pvmaps_input": expert_pvmaps_input},
-                        output={"error": str(error)},
-                        decision="expert_estimate_failed",
-                    )
+            try:
+                expert_output, expert_explanation = run_expert_pvmaps_estimate(
+                    st.session_state, expert_pvmaps_input, api_key
+                )
+                st.session_state["expert_last_run"] = {
+                    "input": expert_pvmaps_input,
+                    "output": expert_output,
+                    "explanation": expert_explanation,
+                }
+            except Exception as error:
+                input_column.error(EXPERT_MODE_TEXT["simulation_error"])
+                add_llm_trace(
+                    st.session_state,
+                    "expert_mode_pvmaps_run",
+                    input_summary={"pvmaps_input": expert_pvmaps_input},
+                    output={"error": str(error)},
+                    decision="expert_estimate_failed",
+                )
+                input_column.error(traceback.format_exc())
 
     expert_last_run = st.session_state.get("expert_last_run")
+    
+    # Visualize the PVMAPS' output
     if expert_last_run:
-        st.subheader(RESULT_TEXT["monthly_yield_header"])
+        result_column.subheader(RESULT_TEXT["monthly_yield_header"])
         expert_fig, expert_ax = plt.subplots(figsize=(10, 5))
         expert_ax.bar(MONTH_LABELS, expert_last_run["output"]["monthly_yield"])
         expert_ax.set_xlabel(RESULT_TEXT["chart_x_label"])
         expert_ax.set_ylabel(f"Yield ({expert_last_run['output']['yield_unit']})")
         expert_ax.set_title(RESULT_TEXT["chart_title"])
         expert_ax.tick_params(axis="x", labelrotation=45)
-        st.pyplot(expert_fig)
+        result_column.pyplot(expert_fig)
 
-        st.subheader(EXPERT_MODE_TEXT["explanation_header"])
-        st.write(expert_last_run["explanation"])
+
+        result_column.subheader(EXPERT_MODE_TEXT["explanation_header"])
+        result_column.write(expert_last_run["explanation"])
 
     st.stop()
 

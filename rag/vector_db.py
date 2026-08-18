@@ -3,8 +3,10 @@ from pathlib import Path
 import chromadb
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 
+from constants import DATA_DIR
 
-DEFAULT_CHROMA_DB_PATH = r"D:\agpv-ai-consultant\data\chroma_db"
+
+DEFAULT_CHROMA_DB_PATH = DATA_DIR / "chroma_db"
 
 
 def get_chroma_client(db_path=DEFAULT_CHROMA_DB_PATH):

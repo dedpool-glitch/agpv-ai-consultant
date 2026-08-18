@@ -54,11 +54,11 @@ questionnaire/manual inputs
 Important files:
 
 ```text
-pvmaps/input_builder.py
-pvmaps/input_validator.py
-pvmaps/matlab_runner.py
-pvmaps/mock_runner.py
-pvmaps/result_explainer.py
+models/pvmaps/input_builder.py
+models/pvmaps/input_validator.py
+models/pvmaps/matlab_runner.py
+models/pvmaps/mock_runner.py
+models/pvmaps/result_explainer.py
 ```
 
 An experimental alternative input path is:

@@ -8,22 +8,18 @@ from constants import (
     RAG_SOURCE_NONE,
     RAG_SOURCE_PAPERS,
 )
-from rag.chunker import chunk_docling_document
-from rag.document_loader import load_pdf_document, load_pdfs_from_folder
 from rag.rag_answerer import answer_with_rag
-from rag.vector_db import (
-    add_chunks_to_collection,
-    format_query_results,
-    get_chroma_client,
-    get_or_create_collection,
-    query_collection,
-)
 
 
 def load_documents_from_path(path):
     """
     Load a single PDF or all PDFs inside a folder.
     """
+    # Docling imports Transformers and Torch. Keep it out of the application
+    # process until document ingestion is explicitly requested so it cannot
+    # preload native libraries that conflict with MATLAB Engine.
+    from rag.document_loader import load_pdf_document, load_pdfs_from_folder
+
     path = Path(path)
 
     if path.is_file() and path.suffix.lower() == ".pdf":
@@ -39,6 +35,10 @@ def chunk_loaded_documents(documents):
     """
     Convert loaded Docling documents into Chroma-ready chunks.
     """
+    # Importing this module loads Transformers and Torch, including Intel's
+    # OpenMP runtime. Retrieval does not need it, so load it only for ingestion.
+    from rag.chunker import chunk_docling_document
+
     all_chunks = []
 
     for document in documents:
@@ -58,6 +58,8 @@ def build_collection_from_path(path, collection_name, db_path=None):
 
     Returns the collection and basic indexing stats.
     """
+    from rag.vector_db import add_chunks_to_collection, get_chroma_client, get_or_create_collection
+
     client = get_chroma_client(db_path=db_path) if db_path else get_chroma_client()
     collection = get_or_create_collection(client, collection_name)
 
@@ -78,6 +80,8 @@ def get_collection(collection_name, db_path=None):
     """
     Open an existing collection by name.
     """
+    from rag.vector_db import get_chroma_client, get_or_create_collection
+
     client = get_chroma_client(db_path=db_path) if db_path else get_chroma_client()
     return get_or_create_collection(client, collection_name)
 
@@ -86,6 +90,8 @@ def search_collection(collection_name, query, n_results=5, db_path=None):
     """
     Search a collection and return formatted results.
     """
+    from rag.vector_db import format_query_results, query_collection
+
     collection = get_collection(collection_name, db_path=db_path)
     results = query_collection(
         collection,

@@ -76,7 +76,7 @@ knowledge-grounding tool.
 - Keep static labels, options, and validation messages in `constants.py`.
 - Keep LLM prompts in `llm/prompts.py`.
 - Keep RAG document loading, chunking, retrieval, and answering in `rag/`.
-- Keep model-specific code in model packages such as `pvmaps/`.
+- Keep model-specific code in packages such as `models/pvmaps/`.
 - Keep app orchestration thin and avoid putting tool logic directly in
   `app.py`.
 - Keep demo scripts in `demos/`.

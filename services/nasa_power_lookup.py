@@ -2,7 +2,14 @@ from pathlib import Path
 import pandas as pd
 
 NASA_CSV_PATH= (
-    Path(__file__).resolve().parents[1] / "PV-MAPS-main" / "pvmaps" / "data" / "NASA_Data.csv"
+    Path(__file__).resolve().parents[1]
+    / "models"
+    / "pvmaps"
+    / "bin"
+    / "PV-MAPS-main"
+    / "pvmaps"
+    / "data"
+    / "NASA_Data.csv"
 )
 
 def get_climate_summary(lat,lon,csv_path=NASA_CSV_PATH):

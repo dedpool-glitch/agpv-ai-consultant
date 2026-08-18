@@ -9,7 +9,8 @@ from rag.pipeline import answer_from_collection
 
 
 COLLECTION_NAME = PAPERS_COLLECTION_NAME
-OUTPUT_PATH = Path(r"D:\agpv-ai-consultant\outputs\rag_answer_demo_results.csv")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+OUTPUT_PATH = PROJECT_ROOT / "outputs" / "rag_answer_demo_results.csv"
 
 
 RAG_DEMO_CASES = [
