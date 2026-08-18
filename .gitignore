@@ -8,3 +8,4 @@ candidate_history.csv
 redundant.py
 resources/
 .venv/
+data/
