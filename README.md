@@ -61,6 +61,23 @@ docs/           design notes, progress notes, and project documentation
 rag/            document loading, chunking, Chroma retrieval, and RAG answering
 ```
 
+## Prerequisites
+
+**MATLAB and MATLAB Engine for Python are required just to launch this app --
+not only to run a PVMAPS simulation.** `models/pvmaps/matlab_runner.py` does
+`import matlab.engine` at module load time, and that module is imported
+eagerly as soon as `app.py` starts, before any mode is even selected. Without
+a working MATLAB Engine for Python install, the app will fail on startup.
+
+- Install a licensed copy of MATLAB.
+- Install the matching `matlabengine` PyPI package for your exact MATLAB
+  release (each `matlabengine` version supports exactly one MATLAB release --
+  see the pin note in `requirements.txt`, and check the "Required MathWorks
+  Products" on each release's PyPI page if your MATLAB version differs).
+- A Purdue GenAI Studio API key (see `docs/AgPV_Student_How_To_Guide.docx` for
+  how to get one) -- this can be entered directly in the app on first launch,
+  no `.env` file required.
+
 ## Setup
 
 Create and activate a virtual environment:
@@ -76,13 +93,15 @@ Install Python dependencies:
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in the repository root:
+Optionally, create a `.env` file in the repository root if you don't want to
+re-enter your API key every time you launch the app:
 
 ```text
-GENAI_STUDIO_API_KEY=your_api_key_here
+PURDUE_GENAI_KEY=your_api_key_here
 ```
 
-The `.env` file should not be committed.
+The `.env` file should not be committed. If you skip this, the app will ask
+for your API key in the browser on first launch instead.
 
 ## Running the App
 
@@ -90,8 +109,8 @@ The `.env` file should not be committed.
 streamlit run app.py
 ```
 
-PVMAPS requires MATLAB, MATLAB Engine for Python, and the local PVMAPS files to
-be available on the machine running the app.
+See Prerequisites above -- MATLAB and a matching MATLAB Engine for Python
+install are required for the app to start at all, not just to run PVMAPS.
 
 ## Testing
 

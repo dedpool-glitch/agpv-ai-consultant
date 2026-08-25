@@ -4,9 +4,25 @@ streamlit==1.58.0
 matplotlib==3.10.9
 # Location lookup
 geopy==2.4.1
-# MATLAB Engine for Python
+# MATLAB Engine for Python -- each matlabengine release supports exactly one
+# MATLAB release. This version matches R2025b. If your installed MATLAB is a
+# different release, `pip install` this exact pin will fail or mismatch --
+# instead run `pip install matlabengine` (unpinned) to get the version that
+# matches whatever MATLAB you actually have, or check the "Required MathWorks
+# Products" on each matlabengine release's PyPI page.
 matlabengine==25.2.2
+# Loads .env files (e.g. PURDUE_GENAI_KEY) if present
+python-dotenv==1.2.2
+# Vector DB for the RAG pipeline (papers/books retrieval)
+chromadb==1.5.9
+# Document parsing/chunking for building the RAG collections
+docling==2.113.0
+docling-core==2.87.1
+# Tabular data handling
+pandas==2.3.3
+# Used indirectly by chromadb/docling for embeddings
+transformers==5.13.1
 #for test cases
 pytest==9.0.3
-psutil
-requests
+psutil==7.2.2
+requests==2.34.2
