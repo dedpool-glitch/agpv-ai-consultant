@@ -47,6 +47,38 @@ def get_expert_form_descriptors() -> list[dict]:
     return get_pvmaps_input_descriptors()
 
 
+def get_pvmaps_output_descriptor(field_id: str) -> dict:
+    """Return one output definition by its model field id."""
+    for field in load_pvmaps_descriptor()["outputs"]:
+        if field["id"] == field_id:
+            return field
+    raise KeyError(f"Unknown PVMAPS output field: {field_id}")
+
+
+def get_pvmaps_output_descriptors() -> list[dict]:
+    """Return every model output definition, preserving JSON order."""
+    return load_pvmaps_descriptor()["outputs"]
+
+
+def describe_output_shape(field: dict) -> str:
+    """
+    Render a field's shape/dimensions as a short human-readable string, e.g.
+    "scalar" or "array of 12 (simulation_block)". Used to make array lengths
+    explicit to the LLM so it can't mistake a 12-entry monthly array for a
+    365-entry daily series.
+    """
+    shape = field.get("shape") or []
+    if not shape:
+        return "scalar"
+
+    dimensions = field.get("dimensions") or {}
+    parts = []
+    for dimension_name in shape:
+        size = (dimensions.get(dimension_name) or {}).get("size")
+        parts.append(f"{size} ({dimension_name})" if size is not None else dimension_name)
+    return "array of " + ", ".join(parts)
+
+
 def build_pvmaps_input_from_descriptor_values(field_values: dict) -> dict:
     """Convert a complete dotted-id value map into the nested model input."""
     expected_ids = {field["id"] for field in get_pvmaps_input_descriptors()}
