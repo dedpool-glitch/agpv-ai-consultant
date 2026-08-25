@@ -320,6 +320,7 @@ SESSION_KEY_PVMAPS_RUNS = "pvmaps_runs"
 SESSION_KEY_QUESTIONNAIRE_STATE = "questionnaire_state"
 SESSION_KEY_DATASHEET = "datasheet"
 SESSION_KEY_LLM_TRACE = "llm_trace"
+SESSION_KEY_API_KEY = "user_api_key"
 
 # --- PVMAPS model ---
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -333,6 +334,17 @@ GENAI_API_KEY_ENV_VAR = "PURDUE_GENAI_KEY"
 SESSION_KEY_APP_MODE = "app_mode"
 APP_MODE_NON_EXPERT = "non_expert"
 APP_MODE_EXPERT = "expert"
+
+API_KEY_TEXT = {
+    "header": "Enter your Purdue GenAI API key",
+    "description": (
+        "This app needs a Purdue GenAI API key to answer questions and explain "
+        "results. Your key is only kept for this session and isn't stored anywhere."
+    ),
+    "label": "API key",
+    "submit_button": "Continue",
+    "missing_key_error": "Please enter an API key to continue.",
+}
 
 EXPERT_MODE_TEXT = {
     "mode_selector_header": "Choose a mode",

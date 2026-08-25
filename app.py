@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import traceback 
 
 from constants import (
+    API_KEY_TEXT,
     APP_TITLE,
     LOCATION_TEXT,
     MONTH_LABELS,
@@ -25,6 +26,7 @@ from constants import (
     MESSAGE_ROLE_ASSISTANT,
     MESSAGE_ROLE_USER,
     MESSAGE_TYPE_PVMAPS_RUN,
+    SESSION_KEY_API_KEY,
     SESSION_KEY_APP_MODE,
     SESSION_KEY_CHAT_MESSAGES,
     SESSION_KEY_DATASHEET,
@@ -40,6 +42,7 @@ from constants import (
 
 from services.location_geocoder import geocode_location
 from llm.consultation_planner import route_conversation_turn
+from llm.expert_followup_answerer import answer_expert_followup_question
 from llm.general_agpv_answerer import answer_general_agpv_question
 from llm.rag_source_router import decide_rag_source
 from models.pvmaps.descriptor import (
@@ -53,11 +56,26 @@ from services.llm_trace import add_llm_trace
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 
 load_dotenv()
-api_key = os.getenv(GENAI_API_KEY_ENV_VAR)
-if not api_key:
-    raise RuntimeError(f"{GENAI_API_KEY_ENV_VAR} is missing from the environment.")
 st.set_page_config(layout="wide")
 st.title(APP_TITLE)
+
+# API key: prefer the env var (so a locally-configured deployment, e.g. for
+# rehearsals, never sees this screen), otherwise fall back to a key entered
+# by the user for this session only.
+st.session_state.setdefault(SESSION_KEY_API_KEY, None)
+api_key = os.getenv(GENAI_API_KEY_ENV_VAR) or st.session_state[SESSION_KEY_API_KEY]
+
+if not api_key:
+    st.subheader(API_KEY_TEXT["header"])
+    st.write(API_KEY_TEXT["description"])
+    entered_api_key = st.text_input(API_KEY_TEXT["label"], type="password")
+    if st.button(API_KEY_TEXT["submit_button"]):
+        if entered_api_key:
+            st.session_state[SESSION_KEY_API_KEY] = entered_api_key
+            st.rerun()
+        else:
+            st.error(API_KEY_TEXT["missing_key_error"])
+    st.stop()
 
 
 def _descriptor_label(field):
@@ -139,69 +157,166 @@ with st.sidebar:
 # Expert mode interface 
 if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
     st.subheader(EXPERT_MODE_TEXT["form_header"])
-    input_column, result_column = st.columns([1, 1.25], gap="large")
+
+    # Fields render in a grid, this many per row, grouped under each
+    # section header -- uses the full page width instead of a narrow
+    # single column, and keeps related fields (e.g. tilt/azimuth) side
+    # by side instead of scattered across a long vertical scroll.
+    FIELDS_PER_ROW = 3
+
+    # Lat/lon are part of the descriptor like any other input, but nobody
+    # actually knows their site's decimal coordinates -- render these two
+    # specially as a location lookup instead of raw number fields.
+    st.markdown("### Location")
+    expert_site_location = st.text_input(
+        LOCATION_TEXT["input_label"], key="expert_site_location"
+    )
+    if st.button(LOCATION_TEXT["geocode_button"], key="expert_geocode_button"):
+        try:
+            expert_coordinates = geocode_location(expert_site_location)
+            st.session_state["expert_location_context"] = {
+                "site_location": expert_site_location,
+                "confirmed_address": expert_coordinates["address"],
+                "latitude": expert_coordinates["latitude"],
+                "longitude": expert_coordinates["longitude"],
+            }
+        except Exception:
+            st.session_state["expert_location_context"] = None
+            st.error(LOCATION_TEXT["geocode_error"])
+
+    expert_location_context = st.session_state.get("expert_location_context")
+    if expert_location_context:
+        st.success(f"Using location: {expert_location_context['confirmed_address']}")
 
     expert_form_values = {}
-    current_group = None
+    expert_field_groups = {}
     for field in get_pvmaps_input_descriptors():
+        if field["id"] in ("lat", "lon"):
+            continue
         field_group = field["id"].split(".", 1)[0] if "." in field["id"] else "location"
-        if field_group != current_group:
-            current_group = field_group
-            input_column.markdown(f"### {field_group.replace('_', ' ').title()}")
-        expert_form_values[field["id"]] = _render_descriptor_input(
-            field, input_column
-        )
+        expert_field_groups.setdefault(field_group, []).append(field)
 
-    if input_column.button(EXPERT_MODE_TEXT["run_button"]):
-        expert_pvmaps_input = build_pvmaps_input_from_descriptor_values(
-            expert_form_values
-        )
-        input_column.subheader("PVMAPS input")
-        input_column.json(expert_pvmaps_input)
-        print("PVMAPS input:\n" + json.dumps(expert_pvmaps_input, indent=2))
+    for group_name, group_fields in expert_field_groups.items():
+        st.markdown(f"### {group_name.replace('_', ' ').title()}")
 
-        expert_errors = validate_pvmaps_descriptor_input(expert_pvmaps_input)
-        if expert_errors:
-            input_column.error(EXPERT_MODE_TEXT["validation_error_header"])
-            for expert_error in expert_errors:
-                input_column.write(f"- {expert_error}")
+        # Checkboxes render as compact inline controls while number/select
+        # fields render as full bordered boxes below their label -- mixing
+        # the two in one row looks uneven, so render each kind in its own
+        # rows instead of interleaving them.
+        toggle_fields = [f for f in group_fields if f.get("element_type") == "boolean"]
+        other_fields = [f for f in group_fields if f.get("element_type") != "boolean"]
+
+        for fields_of_one_kind in (other_fields, toggle_fields):
+            for row_start in range(0, len(fields_of_one_kind), FIELDS_PER_ROW):
+                row_fields = fields_of_one_kind[row_start:row_start + FIELDS_PER_ROW]
+                row_columns = st.columns(FIELDS_PER_ROW)
+                for column, field in zip(row_columns, row_fields):
+                    expert_form_values[field["id"]] = _render_descriptor_input(field, column)
+
+    if st.button(EXPERT_MODE_TEXT["run_button"]):
+        if not expert_location_context:
+            st.error(EXPERT_MODE_TEXT["missing_location_error"])
         else:
-            try:
-                expert_output, expert_explanation = run_expert_pvmaps_estimate(
-                    st.session_state, expert_pvmaps_input, api_key
-                )
-                st.session_state["expert_last_run"] = {
-                    "input": expert_pvmaps_input,
-                    "output": expert_output,
-                    "explanation": expert_explanation,
-                }
-            except Exception as error:
-                input_column.error(EXPERT_MODE_TEXT["simulation_error"])
-                add_llm_trace(
-                    st.session_state,
-                    "expert_mode_pvmaps_run",
-                    input_summary={"pvmaps_input": expert_pvmaps_input},
-                    output={"error": str(error)},
-                    decision="expert_estimate_failed",
-                )
-                input_column.error(traceback.format_exc())
+            expert_form_values["lat"] = expert_location_context["latitude"]
+            expert_form_values["lon"] = expert_location_context["longitude"]
+            expert_pvmaps_input = build_pvmaps_input_from_descriptor_values(
+                expert_form_values
+            )
+            print("PVMAPS input:\n" + json.dumps(expert_pvmaps_input, indent=2))
+
+            expert_errors = validate_pvmaps_descriptor_input(expert_pvmaps_input)
+            if expert_errors:
+                st.error(EXPERT_MODE_TEXT["validation_error_header"])
+                for expert_error in expert_errors:
+                    st.write(f"- {expert_error}")
+            else:
+                try:
+                    expert_output, expert_explanation = run_expert_pvmaps_estimate(
+                        st.session_state, expert_pvmaps_input, api_key
+                    )
+                    st.session_state["expert_last_run"] = {
+                        "input": expert_pvmaps_input,
+                        "output": expert_output,
+                        "explanation": expert_explanation,
+                    }
+                    # A new run means any previous follow-up chat no longer
+                    # applies to what's on screen -- start fresh.
+                    st.session_state["expert_chat_messages"] = []
+                except Exception as error:
+                    st.error(EXPERT_MODE_TEXT["simulation_error"])
+                    add_llm_trace(
+                        st.session_state,
+                        "expert_mode_pvmaps_run",
+                        input_summary={"pvmaps_input": expert_pvmaps_input},
+                        output={"error": str(error)},
+                        decision="expert_estimate_failed",
+                    )
+                    st.error(traceback.format_exc())
 
     expert_last_run = st.session_state.get("expert_last_run")
-    
-    # Visualize the PVMAPS' output
+
+    # Visualize the PVMAPS' output -- below the form, full width.
     if expert_last_run:
-        result_column.subheader(RESULT_TEXT["monthly_yield_header"])
+        st.subheader(RESULT_TEXT["monthly_yield_header"])
         expert_fig, expert_ax = plt.subplots(figsize=(10, 5))
         expert_ax.bar(MONTH_LABELS, expert_last_run["output"]["monthly_yield"])
         expert_ax.set_xlabel(RESULT_TEXT["chart_x_label"])
         expert_ax.set_ylabel(f"Yield ({expert_last_run['output']['yield_unit']})")
         expert_ax.set_title(RESULT_TEXT["chart_title"])
         expert_ax.tick_params(axis="x", labelrotation=45)
-        result_column.pyplot(expert_fig)
+        st.pyplot(expert_fig)
 
+        st.subheader(EXPERT_MODE_TEXT["explanation_header"])
+        st.write(expert_last_run["explanation"])
 
-        result_column.subheader(EXPERT_MODE_TEXT["explanation_header"])
-        result_column.write(expert_last_run["explanation"])
+        # Follow-up chat about this specific run, grounded in the same
+        # input/output plus RAG context -- resets whenever a new run
+        # happens (see the reset next to expert_last_run above).
+        st.subheader("Ask about this result")
+        st.session_state.setdefault("expert_chat_messages", [])
+        for expert_chat_message in st.session_state["expert_chat_messages"]:
+            with st.chat_message(expert_chat_message["role"]):
+                st.write(expert_chat_message["content"])
+
+        expert_followup_question = st.chat_input(
+            "Ask a question about this result", key="expert_chat_input"
+        )
+        if expert_followup_question:
+            st.session_state["expert_chat_messages"].append({
+                "role": MESSAGE_ROLE_USER,
+                "content": expert_followup_question,
+            })
+
+            try:
+                expert_followup_context = retrieve_for_source("both", expert_followup_question)
+            except Exception:
+                expert_followup_context = []
+
+            expert_followup_answer = answer_expert_followup_question(
+                expert_followup_question,
+                api_key,
+                expert_last_run["input"],
+                expert_last_run["output"],
+                expert_last_run["explanation"],
+                conversation_history=st.session_state["expert_chat_messages"],
+                retrieved_context=expert_followup_context,
+            )
+            st.session_state["expert_chat_messages"].append({
+                "role": MESSAGE_ROLE_ASSISTANT,
+                "content": expert_followup_answer,
+            })
+
+            add_llm_trace(
+                st.session_state,
+                "expert_mode_followup_chat",
+                input_summary={
+                    "question": expert_followup_question,
+                    "retrieved_count": len(expert_followup_context),
+                },
+                output={"answer": expert_followup_answer},
+                decision="expert_followup_answered",
+            )
+            st.rerun()
 
     st.stop()
 
