@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 import traceback 
 
 from constants import (
+    ACCESS_PASSCODE_ENV_VAR,
+    ACCESS_PASSCODE_TEXT,
+    SESSION_KEY_ACCESS_PASSCODE_OK,
     API_KEY_TEXT,
     APP_TITLE,
     LOCATION_TEXT,
@@ -64,6 +67,27 @@ st.title(APP_TITLE)
 # One id per browser session, used only to group conversation_log.jsonl rows
 # back into a single conversation later -- not tied to any account/identity.
 st.session_state.setdefault("session_id", uuid.uuid4().hex)
+
+# Access passcode: only active when AGPV_ACCESS_PASSCODE is set in the
+# environment (e.g. for an ngrok-tunneled demo). Local development with no
+# such env var never sees this screen. Not real per-student authentication --
+# just a lightweight filter for a link that's reachable by anyone who has it.
+_access_passcode = os.getenv(ACCESS_PASSCODE_ENV_VAR)
+if _access_passcode:
+    st.session_state.setdefault(SESSION_KEY_ACCESS_PASSCODE_OK, False)
+    if not st.session_state[SESSION_KEY_ACCESS_PASSCODE_OK]:
+        st.subheader(ACCESS_PASSCODE_TEXT["header"])
+        st.write(ACCESS_PASSCODE_TEXT["description"])
+        entered_passcode = st.text_input(ACCESS_PASSCODE_TEXT["label"], type="password")
+        if st.button(ACCESS_PASSCODE_TEXT["submit_button"]):
+            if not entered_passcode:
+                st.error(ACCESS_PASSCODE_TEXT["missing_code_error"])
+            elif entered_passcode == _access_passcode:
+                st.session_state[SESSION_KEY_ACCESS_PASSCODE_OK] = True
+                st.rerun()
+            else:
+                st.error(ACCESS_PASSCODE_TEXT["wrong_code_error"])
+        st.stop()
 
 # API key: prefer the env var (so a locally-configured deployment, e.g. for
 # rehearsals, never sees this screen), otherwise fall back to a key entered

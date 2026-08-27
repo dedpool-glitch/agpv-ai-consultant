@@ -346,6 +346,23 @@ API_KEY_TEXT = {
     "missing_key_error": "Please enter an API key to continue.",
 }
 
+# Optional, lightweight access gate for demo/testing deployments (e.g. an
+# ngrok tunnel) where the app is reachable by anyone with the URL. Only
+# active when ACCESS_PASSCODE_ENV_VAR is set -- if it's unset (the normal
+# case for local development), this gate is skipped entirely. This is not
+# real per-student authentication, just a "you got this from us" filter.
+ACCESS_PASSCODE_ENV_VAR = "AGPV_ACCESS_PASSCODE"
+SESSION_KEY_ACCESS_PASSCODE_OK = "access_passcode_ok"
+
+ACCESS_PASSCODE_TEXT = {
+    "header": "Enter access code",
+    "description": "This link is limited to people who were given an access code.",
+    "label": "Access code",
+    "submit_button": "Continue",
+    "missing_code_error": "Please enter the access code to continue.",
+    "wrong_code_error": "That access code isn't correct.",
+}
+
 EXPERT_MODE_TEXT = {
     "mode_selector_header": "Choose a mode",
     "non_expert_button": "Guided mode",
