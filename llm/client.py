@@ -1,6 +1,6 @@
 import requests
 
-def call_llm(messages,api_key,model="llama3.2:latest",temperature=None):
+def call_llm(messages,api_key,model="llama4:latest",temperature=None):
     url="https://genai.rcac.purdue.edu/api/chat/completions"
 
     headers={
