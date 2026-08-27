@@ -2,6 +2,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import json
 import os
+import uuid
 from dotenv import load_dotenv
 
 import traceback 
@@ -51,6 +52,7 @@ from models.pvmaps.descriptor import (
     validate_pvmaps_descriptor_input,
 )
 from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
+from services.conversation_log import log_conversation_turn
 from services.expert_estimate_service import run_expert_pvmaps_estimate
 from services.llm_trace import add_llm_trace
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
@@ -58,6 +60,10 @@ from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 load_dotenv()
 st.set_page_config(layout="wide")
 st.title(APP_TITLE)
+
+# One id per browser session, used only to group conversation_log.jsonl rows
+# back into a single conversation later -- not tied to any account/identity.
+st.session_state.setdefault("session_id", uuid.uuid4().hex)
 
 # API key: prefer the env var (so a locally-configured deployment, e.g. for
 # rehearsals, never sees this screen), otherwise fall back to a key entered
@@ -316,6 +322,11 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                 output={"answer": expert_followup_answer},
                 decision="expert_followup_answered",
             )
+            log_conversation_turn(
+                st.session_state["session_id"], "expert_followup", "expert_followup",
+                expert_followup_question, expert_followup_answer,
+                retrieved_chunks=expert_followup_context,
+            )
             st.rerun()
 
     st.stop()
@@ -503,6 +514,10 @@ if question:
             "role": MESSAGE_ROLE_ASSISTANT,
             "content": plan["question"],
         })
+        log_conversation_turn(
+            st.session_state["session_id"], "guided", TURN_TYPE_GATHER_INFO,
+            question, plan["question"],
+        )
 
     elif plan["turn_type"] == TURN_TYPE_RUN_PVMAPS:
         try:
@@ -511,6 +526,10 @@ if question:
                 api_key,
                 location_context,
                 latest_user_message=question,
+            )
+            log_conversation_turn(
+                st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
+                question, "PVMAPS estimate generated",
             )
         except Exception as error:
             st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
@@ -523,6 +542,10 @@ if question:
                 input_summary={SESSION_KEY_LOCATION_CONTEXT: location_context},
                 output={"error": str(error)},
                 decision="estimate_failed",
+            )
+            log_conversation_turn(
+                st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
+                question, "PVMAPS simulation failed",
             )
 
     else:
@@ -590,5 +613,9 @@ if question:
             "role": MESSAGE_ROLE_ASSISTANT,
             "content": answer,
         })
+        log_conversation_turn(
+            st.session_state["session_id"], "guided", "general_question",
+            question, answer, retrieved_chunks=retrieved_context,
+        )
 
     st.rerun()
