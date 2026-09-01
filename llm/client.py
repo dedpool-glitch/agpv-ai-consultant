@@ -16,7 +16,7 @@ def call_llm(messages,api_key,model="llama4:latest",temperature=None):
     if temperature is not None:
         body["temperature"] = temperature
 
-    response=requests.post(url,headers=headers,json=body,timeout=30)
+    response=requests.post(url,headers=headers,json=body,timeout=60)
     response.raise_for_status()
 
     return response.json()["choices"][0]["message"]["content"]
