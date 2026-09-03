@@ -6,33 +6,10 @@ conversation flow, usefulness of responses, and solar-yield estimate workflow.
 
 ## Demo Access
 
-Demo URL:
-
-```text
-<paste temporary app URL here>
-```
-
-Access window:
-
-```text
-Thursday, 6:00 PM to 11:30 PM Eastern Time
-```
-
 Access code:
-
 ```text
-<paste demo access code here>
+purdue_vip
 ```
-
-Feedback form:
-
-```text
-https://forms.cloud.microsoft/r/gkx03A8BQA
-```
-
-Important notes:
-
-- The app will be available only during the specified demo window.
 
 ## Before You Start
 
