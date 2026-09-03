@@ -1,8 +1,6 @@
-# Temporary Demo Student Guide
+# Demo Guide
 
-This guide is for testing the AgPV Assistant during a temporary demo
-window. The app is an active research prototype, so the goal is to test the
-conversation flow, usefulness of responses, and solar-yield estimate workflow.
+This guide contains instructions that will help you use the app and test appropriate flows. The app is an active research prototype, so the goal is to test the conversation flow, usefulness of responses, and solar-yield estimate workflow.
 
 ## Demo Access
 
@@ -13,9 +11,7 @@ purdue_vip
 
 ## Before You Start
 
-You will need your own Purdue GenAI Studio API key. This is needed because the
-assistant uses Purdue GenAI Studio to answer questions and explain simulation
-results.
+You will need your own Purdue GenAI Studio API key. This is needed because the assistant uses Purdue GenAI Studio to answer questions and explain simulation results.
 
 To get an API key:
 
@@ -41,8 +37,7 @@ If the app asks for an API key:
 2. The key is kept only for your current app session.
 3. Do not share your API key with anyone else.
 
-If the app does not ask for an API key, the demo host has already configured
-one for the app session.
+If the app does not ask for an API key, the demo host has already configured one for the app session.
 
 ## What The App Does
 
@@ -50,8 +45,7 @@ The AgPV Assistant helps users explore agrivoltaic planning questions.
 
 Current capabilities:
 
-- Collects basic user context, such as role, experience level, project goal,
-  and optional site location.
+- Collects basic user context, such as role, experience level, project goal, and optional site location.
 - Answers general agrivoltaics and solar-design questions.
 - Uses validated papers retrieval for research-grounded answers when relevant.
 - Can run MATLAB/PVMAPS in the background for solar-yield estimates.
@@ -82,8 +76,7 @@ Enter:
 - Your user type.
 - Your solar-design experience level.
 - Your project goal.
-- A site location if you want location-specific discussion or a solar-yield
-  estimate.
+- A site location if you want location-specific discussion or a solar-yield estimate.
 - Optional extra details about your goal.
 
 Example site locations:
@@ -170,8 +163,7 @@ Use it if you want to manually enter:
 
 The app validates the inputs before running PVMAPS.
 
-## What Feedback To Give
-
+## Feedback Form
 Please submit feedback here:
 
 ```text
