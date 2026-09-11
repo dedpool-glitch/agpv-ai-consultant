@@ -20,16 +20,25 @@ def run_expert_pvmaps_estimate(session_state, pvmaps_input, api_key):
     """
     output = run_pvmaps(pvmaps_input, PVMAPS_SCRIPT_PATH)
 
+    input_provenance = {
+        "source": "expert_form",
+        "justification": (
+            "The user submitted this configuration through the expert form. "
+            "Some prefilled values may have been retained; individual edits are not tracked. "
+            "Site coordinates were resolved by the geocoder."
+        ),
+    }
     explanation = explain_output(
         output,
         api_key,
         pvmaps_input=pvmaps_input,
+        input_provenance=input_provenance,
     )
 
     add_llm_trace(
         session_state,
         "expert_mode_pvmaps_run",
-        input_summary={"pvmaps_input": pvmaps_input},
+        input_summary={"pvmaps_input": pvmaps_input, "input_provenance": input_provenance},
         output={
             "pvmaps_output": output,
             "explanation": explanation,

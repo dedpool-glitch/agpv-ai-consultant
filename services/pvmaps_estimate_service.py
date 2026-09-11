@@ -19,6 +19,11 @@ from questionnaire.state import initialize_questionnaire_state, update_questionn
 from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
 from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
 from services.llm_trace import add_llm_trace
+from services.parameter_provenance import (
+    build_parameter_provenance,
+    build_report_provenance,
+    describe_assumptions,
+)
 
 
 def retrieve_recommendation_context(session_state, latest_user_message):
@@ -124,32 +129,27 @@ def run_recommended_pvmaps_estimate(
         return False
 
     justifications = recommendation.get("justifications", {})
+    parameter_provenance = build_parameter_provenance(
+        parsed_recommendation, recommendation, baseline_state,
+        session_state[SESSION_KEY_CHAT_MESSAGES],
+    )
     newly_confirmed = {}
     changed_fields = {}
     for field, value in parsed_recommendation.items():
         baseline_value = baseline_state.get(field)
 
         if baseline_value is None:
-            update_questionnaire_state(run_state, field, value, assumed=True)
-            if field in justifications:
-                run_state["assumptions"].append(f"{field}: {justifications[field]}")
+            update_questionnaire_state(run_state, field, value)
             newly_confirmed[field] = value
         elif value != baseline_value:
             # The recommender explicitly changed an already-set field based on
             # the user's latest message -- treat this as a one-off variant for
             # this run only, not a change to the session's baseline.
             update_questionnaire_state(run_state, field, value, assumed=False)
-            if field in justifications:
-                run_state["assumptions"].append(f"{field}: {justifications[field]}")
             changed_fields[field] = value
 
-    # Only fold newly-filled fields back into the shared baseline, so a
-    # one-off "what if" variant doesn't become the new default for future
-    # runs in this session.
-    for field, value in newly_confirmed.items():
-        if baseline_state.get(field) is None:
-            update_questionnaire_state(baseline_state, field, value, assumed=True)
-    session_state[SESSION_KEY_QUESTIONNAIRE_STATE] = baseline_state
+    run_state["parameter_provenance"] = parameter_provenance
+    run_state["assumptions"] = describe_assumptions(parameter_provenance)
 
     pvmaps_input = build_pvmaps_input_from_questionnaire(run_state, lat, lon)
     errors = validate_pvmaps_input(pvmaps_input)
@@ -167,6 +167,19 @@ def run_recommended_pvmaps_estimate(
         )
         return False
 
+    # Keep variant origins local to this run, just like variant values.
+    baseline_provenance = baseline_state.setdefault("parameter_provenance", {})
+    for field, value in newly_confirmed.items():
+        update_questionnaire_state(baseline_state, field, value)
+        baseline_provenance[field] = copy.deepcopy(parameter_provenance[field])
+    for field, item in parameter_provenance.items():
+        if baseline_state.get(field) == item["value"]:
+            baseline_provenance.setdefault(field, copy.deepcopy(item))
+    baseline_state["assumptions"] = describe_assumptions(baseline_provenance)
+    session_state[SESSION_KEY_QUESTIONNAIRE_STATE] = baseline_state
+    input_provenance = build_report_provenance(parameter_provenance, pvmaps_input)
+    report_history = copy.deepcopy(session_state[SESSION_KEY_CHAT_MESSAGES])
+
     output = run_pvmaps(
         pvmaps_input,
         PVMAPS_SCRIPT_PATH
@@ -176,14 +189,21 @@ def run_recommended_pvmaps_estimate(
         api_key,
         user_profile=session_state.get(SESSION_KEY_USER_PROFILE),
         pvmaps_input=pvmaps_input,
+        input_provenance=input_provenance,
+        user_request=latest_user_message,
+        conversation_history=report_history,
     )
 
     run_record = {
+        "location_context": copy.deepcopy(location_context),
         "label": run_label or ("Variant estimate" if changed_fields else "Solar-yield estimate"),
         "input": pvmaps_input,
         "output": output,
         "explanation": explanation,
         "overrides": changed_fields,
+        "input_provenance": copy.deepcopy(input_provenance),
+        "assumptions": list(run_state["assumptions"]),
+        "user_request": latest_user_message,
     }
     session_state[SESSION_KEY_PVMAPS_RUNS].append(run_record)
     session_state[SESSION_KEY_CHAT_MESSAGES].append({
@@ -202,6 +222,9 @@ def run_recommended_pvmaps_estimate(
             "pvmaps_input": pvmaps_input,
             "recommendation_justifications": justifications,
             "changed_fields": changed_fields,
+            "input_provenance": input_provenance,
+            "user_request": latest_user_message,
+            "report_conversation_history": report_history,
         },
         output={
             "pvmaps_output": output,

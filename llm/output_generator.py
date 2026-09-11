@@ -137,7 +137,18 @@ def describe_monthly_extremes(pvmaps_output):
     )
 
 
-def explain_output(pvmaps_output, api_key, user_profile=None, pvmaps_input=None, retrieved_context=None):
+def explain_output(
+    pvmaps_output, api_key, user_profile=None, pvmaps_input=None,
+    retrieved_context=None, input_provenance=None, user_request=None,
+    conversation_history=None,
+):
+    chat_context = [
+        {"role": message["role"], "content": message["content"]}
+        for message in (conversation_history or [])
+        if message.get("role") in ("user", "assistant")
+        and isinstance(message.get("content"), str)
+        and not message.get("type")
+    ]
     context_text = format_retrieved_context(retrieved_context)
     context_section = (
         f"Retrieved source excerpts (reference briefly if they help explain this result; "
@@ -166,8 +177,13 @@ def explain_output(pvmaps_output, api_key, user_profile=None, pvmaps_input=None,
                 f"Full PVMAPS input (the configuration that was actually run):\n{json.dumps(pvmaps_input, indent=2)}\n\n"
                 f"{input_field_section}"
                 f"User Profile:\n{json.dumps(user_profile, indent=2)}\n\n"
+                f"User request that triggered this run:\n{json.dumps(user_request)}\n\n"
+                f"Conversation context (not verified simulation data):\n{json.dumps(chat_context, indent=2)}\n\n"
+                f"Input origins and selection rationales:\n{json.dumps(input_provenance, indent=2)}\n\n"
                 f"{context_section}"
-                "Generate a clear, simple explanation of the PVMAPS output that can be easily understood by the user."
+                "Explain this run in response to the user's current request. "
+                "Use the report structure and audience guidance in the system instructions, "
+                "grounding findings in the supplied results and assumptions in their recorded origins."
             ),
         },
     ]
