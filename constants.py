@@ -103,6 +103,7 @@ QUESTIONNAIRE_UI_TEXT = {
 }
 
 CHAT_UI_TEXT = {
+    "thinking_message": "Thinking...",
     "description": "",
     "answer_label": "Ask a question, or tell me about your project",
     "opening_message": "Hi! Ask me anything about agrivoltaics, or tell me about your project and I can put together a solar-yield estimate when you're ready.",
@@ -377,4 +378,3 @@ EXPERT_MODE_TEXT = {
     "explanation_header": "Output explanation",
     "simulation_error": "PVMAPS simulation failed.",
 }
-

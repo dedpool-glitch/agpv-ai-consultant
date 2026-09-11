@@ -1,5 +1,5 @@
 import streamlit as st
-import matplotlib.pyplot as plt
+import copy
 import json
 import os
 import uuid
@@ -14,10 +14,8 @@ from constants import (
     API_KEY_TEXT,
     APP_TITLE,
     LOCATION_TEXT,
-    MONTH_LABELS,
     CHAT_UI_TEXT,
     EXPERT_MODE_TEXT,
-    RESULT_TEXT,
     USER_PROFILE_TEXT,
     USER_TYPE_OPTIONS,
     SOLAR_EXPERIENCE_OPTIONS,
@@ -59,6 +57,8 @@ from services.conversation_log import log_conversation_turn
 from services.expert_estimate_service import run_expert_pvmaps_estimate
 from services.llm_trace import add_llm_trace
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
+from ui.simulation_result import render_simulation_result
+from ui.simulation_comparison import render_simulation_comparison
 
 load_dotenv()
 st.set_page_config(layout="wide")
@@ -265,6 +265,8 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                         st.session_state, expert_pvmaps_input, api_key
                     )
                     st.session_state["expert_last_run"] = {
+                        "location_context": copy.deepcopy(expert_location_context),
+                        "input_provenance": {"source": "expert_form"},
                         "input": expert_pvmaps_input,
                         "output": expert_output,
                         "explanation": expert_explanation,
@@ -287,14 +289,7 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
 
     # Visualize the PVMAPS' output -- below the form, full width.
     if expert_last_run:
-        st.subheader(RESULT_TEXT["monthly_yield_header"])
-        expert_fig, expert_ax = plt.subplots(figsize=(10, 5))
-        expert_ax.bar(MONTH_LABELS, expert_last_run["output"]["monthly_yield"])
-        expert_ax.set_xlabel(RESULT_TEXT["chart_x_label"])
-        expert_ax.set_ylabel(f"Yield ({expert_last_run['output']['yield_unit']})")
-        expert_ax.set_title(RESULT_TEXT["chart_title"])
-        expert_ax.tick_params(axis="x", labelrotation=45)
-        st.pyplot(expert_fig)
+        render_simulation_result(expert_last_run)
 
         st.subheader(EXPERT_MODE_TEXT["explanation_header"])
         st.write(expert_last_run["explanation"])
@@ -317,40 +312,44 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                 "content": expert_followup_question,
             })
 
-            try:
-                expert_followup_context = retrieve_for_source("both", expert_followup_question)
-            except Exception:
-                expert_followup_context = []
+            with st.chat_message(MESSAGE_ROLE_USER):
+                st.write(expert_followup_question)
 
-            expert_followup_answer = answer_expert_followup_question(
-                expert_followup_question,
-                api_key,
-                expert_last_run["input"],
-                expert_last_run["output"],
-                expert_last_run["explanation"],
-                conversation_history=st.session_state["expert_chat_messages"],
-                retrieved_context=expert_followup_context,
-            )
-            st.session_state["expert_chat_messages"].append({
-                "role": MESSAGE_ROLE_ASSISTANT,
-                "content": expert_followup_answer,
-            })
+            with st.spinner(CHAT_UI_TEXT["thinking_message"]):
+                try:
+                    expert_followup_context = retrieve_for_source("both", expert_followup_question)
+                except Exception:
+                    expert_followup_context = []
 
-            add_llm_trace(
-                st.session_state,
-                "expert_mode_followup_chat",
-                input_summary={
-                    "question": expert_followup_question,
-                    "retrieved_count": len(expert_followup_context),
-                },
-                output={"answer": expert_followup_answer},
-                decision="expert_followup_answered",
-            )
-            log_conversation_turn(
-                st.session_state["session_id"], "expert_followup", "expert_followup",
-                expert_followup_question, expert_followup_answer,
-                retrieved_chunks=expert_followup_context,
-            )
+                expert_followup_answer = answer_expert_followup_question(
+                    expert_followup_question,
+                    api_key,
+                    expert_last_run["input"],
+                    expert_last_run["output"],
+                    expert_last_run["explanation"],
+                    conversation_history=st.session_state["expert_chat_messages"],
+                    retrieved_context=expert_followup_context,
+                )
+                st.session_state["expert_chat_messages"].append({
+                    "role": MESSAGE_ROLE_ASSISTANT,
+                    "content": expert_followup_answer,
+                })
+
+                add_llm_trace(
+                    st.session_state,
+                    "expert_mode_followup_chat",
+                    input_summary={
+                        "question": expert_followup_question,
+                        "retrieved_count": len(expert_followup_context),
+                    },
+                    output={"answer": expert_followup_answer},
+                    decision="expert_followup_answered",
+                )
+                log_conversation_turn(
+                    st.session_state["session_id"], "expert_followup", "expert_followup",
+                    expert_followup_question, expert_followup_answer,
+                    retrieved_chunks=expert_followup_context,
+                )
             st.rerun()
 
     st.stop()
@@ -455,25 +454,13 @@ for message in st.session_state[SESSION_KEY_CHAT_MESSAGES]:
         pvmaps_runs = st.session_state.get(SESSION_KEY_PVMAPS_RUNS, [])
         if run_index < len(pvmaps_runs):
             run = pvmaps_runs[run_index]
-            with st.expander(f"{RESULT_TEXT['latest_estimate_header']}: {run['label']}", expanded=True):
-                st.subheader(LOCATION_TEXT["result_location_header"])
-                st.write(address or "No confirmed site location")
-
-                if run.get("overrides"):
-                    st.caption(f"Changed from baseline: {run['overrides']}")
-
-                st.subheader(RESULT_TEXT["monthly_yield_header"])
-                fig, ax = plt.subplots(figsize=(10, 5))
-                ax.bar(MONTH_LABELS, run["output"]["monthly_yield"])
-                ax.set_xlabel(RESULT_TEXT["chart_x_label"])
-                ax.set_ylabel(f"Yield ({run['output']['yield_unit']})")
-                ax.set_title(RESULT_TEXT["chart_title"])
-                ax.tick_params(axis="x", labelrotation=45)
-                st.pyplot(fig)
+            render_simulation_result(run)
         continue
 
     with st.chat_message(message["role"]):
         st.write(message["content"])
+
+render_simulation_comparison(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []))
 
 question = st.chat_input(CHAT_UI_TEXT["answer_label"], key="chat_input")
 if question:
@@ -482,164 +469,173 @@ if question:
         "content": question,
     })
 
-    plan = route_conversation_turn(
-        api_key,
-        user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
-        location_context=location_context,
-        conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
-        pvmaps_runs=st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
-    )
-    add_llm_trace(
-        st.session_state,
-        "turn_router",
-        input_summary={
-            SESSION_KEY_USER_PROFILE: st.session_state.get(SESSION_KEY_USER_PROFILE),
-            SESSION_KEY_LOCATION_CONTEXT: location_context,
-            "conversation_history": st.session_state[SESSION_KEY_CHAT_MESSAGES],
-            SESSION_KEY_PVMAPS_RUNS: st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
-        },
-        output=plan,
-        decision=plan["turn_type"],
-    )
+    with st.chat_message(MESSAGE_ROLE_USER):
+        st.write(question)
 
-    if plan.get("mentioned_location"):
-        try:
-            coordinates = geocode_location(plan["mentioned_location"])
-            location_context = {
-                "site_location": plan["mentioned_location"],
-                "confirmed_address": coordinates["address"],
-                "latitude": coordinates["latitude"],
-                "longitude": coordinates["longitude"],
-            }
-            st.session_state[SESSION_KEY_LOCATION_CONTEXT] = location_context
-            add_llm_trace(
-                st.session_state,
-                "location_geocoder",
-                input_summary={"mentioned_location": plan["mentioned_location"]},
-                output=location_context,
-                decision="location_updated",
-            )
-        except Exception as error:
-            st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
-                "role": MESSAGE_ROLE_ASSISTANT,
-                "content": f"I couldn't confirm that location ('{plan['mentioned_location']}'). Could you try a simpler city/state or check the spelling?",
-            })
-            add_llm_trace(
-                st.session_state,
-                "location_geocoder",
-                input_summary={"mentioned_location": plan["mentioned_location"]},
-                output={"error": str(error)},
-                decision="location_update_failed",
-            )
-            st.rerun()
-
-    if plan["turn_type"] == TURN_TYPE_GATHER_INFO and plan.get("question"):
-        st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
-            "role": MESSAGE_ROLE_ASSISTANT,
-            "content": plan["question"],
-        })
-        log_conversation_turn(
-            st.session_state["session_id"], "guided", TURN_TYPE_GATHER_INFO,
-            question, plan["question"],
-        )
-
-    elif plan["turn_type"] == TURN_TYPE_RUN_PVMAPS:
-        try:
-            run_recommended_pvmaps_estimate(
-                st.session_state,
-                api_key,
-                location_context,
-                latest_user_message=question,
-            )
-            log_conversation_turn(
-                st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
-                question, "PVMAPS estimate generated",
-            )
-        except Exception as error:
-            st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
-                "role": MESSAGE_ROLE_ASSISTANT,
-                "content": "I tried to run a solar-yield estimate, but PVMAPS could not complete the simulation. We can keep discussing the setup and assumptions.",
-            })
-            add_llm_trace(
-                st.session_state,
-                "pvmaps_background_tool",
-                input_summary={SESSION_KEY_LOCATION_CONTEXT: location_context},
-                output={"error": str(error)},
-                decision="estimate_failed",
-            )
-            log_conversation_turn(
-                st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
-                question, "PVMAPS simulation failed",
-            )
-
-    else:
-        pvmaps_runs = st.session_state.get(SESSION_KEY_PVMAPS_RUNS, [])
-        latest_pvmaps_output = pvmaps_runs[-1]["output"] if pvmaps_runs else None
-
-        retrieved_context = []
-        try:
-            rag_plan = decide_rag_source(
-                question,
-                api_key,
-                conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
-            )
-            add_llm_trace(
-                st.session_state,
-                "rag_source_router",
-                input_summary={"question": question},
-                output=rag_plan,
-                decision=rag_plan["source"],
-            )
-            retrieved_context = retrieve_for_source(rag_plan["source"], question)
-            add_llm_trace(
-                st.session_state,
-                "rag_retrieval",
-                input_summary={"question": question, "source": rag_plan["source"]},
-                output={
-                    "retrieved_count": len(retrieved_context),
-                    "chunks": summarize_retrieved_chunks(retrieved_context),
-                },
-                decision="chunks_retrieved" if retrieved_context else "no_chunks_found",
-            )
-        except Exception as error:
-            add_llm_trace(
-                st.session_state,
-                "rag_source_router",
-                input_summary={"question": question},
-                output={"error": str(error)},
-                decision="rag_skipped_due_to_error",
-            )
-
-        answer = answer_general_agpv_question(
-            question,
+    with st.spinner(CHAT_UI_TEXT["thinking_message"]):
+        plan = route_conversation_turn(
             api_key,
             user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
             location_context=location_context,
-            pvmaps_state=st.session_state.get(SESSION_KEY_QUESTIONNAIRE_STATE),
-            latest_pvmaps_output=latest_pvmaps_output,
             conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
-            retrieved_context=retrieved_context,
+            pvmaps_runs=st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
         )
         add_llm_trace(
             st.session_state,
-            "general_agpv_answerer",
+            "turn_router",
             input_summary={
-                "question": question,
                 SESSION_KEY_USER_PROFILE: st.session_state.get(SESSION_KEY_USER_PROFILE),
                 SESSION_KEY_LOCATION_CONTEXT: location_context,
                 "conversation_history": st.session_state[SESSION_KEY_CHAT_MESSAGES],
-                "retrieved_context_count": len(retrieved_context),
+                SESSION_KEY_PVMAPS_RUNS: st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
             },
-            output={"answer": answer},
-            decision="answered_general_question",
+            output=plan,
+            decision=plan["turn_type"],
         )
-        st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
-            "role": MESSAGE_ROLE_ASSISTANT,
-            "content": answer,
-        })
-        log_conversation_turn(
-            st.session_state["session_id"], "guided", "general_question",
-            question, answer, retrieved_chunks=retrieved_context,
-        )
+
+        if plan.get("mentioned_location"):
+            try:
+                coordinates = geocode_location(plan["mentioned_location"])
+                location_context = {
+                    "site_location": plan["mentioned_location"],
+                    "confirmed_address": coordinates["address"],
+                    "latitude": coordinates["latitude"],
+                    "longitude": coordinates["longitude"],
+                }
+                st.session_state[SESSION_KEY_LOCATION_CONTEXT] = location_context
+                add_llm_trace(
+                    st.session_state,
+                    "location_geocoder",
+                    input_summary={"mentioned_location": plan["mentioned_location"]},
+                    output=location_context,
+                    decision="location_updated",
+                )
+            except Exception as error:
+                st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+                    "role": MESSAGE_ROLE_ASSISTANT,
+                    "content": f"I couldn't confirm that location ('{plan['mentioned_location']}'). Could you try a simpler city/state or check the spelling?",
+                })
+                add_llm_trace(
+                    st.session_state,
+                    "location_geocoder",
+                    input_summary={"mentioned_location": plan["mentioned_location"]},
+                    output={"error": str(error)},
+                    decision="location_update_failed",
+                )
+                st.rerun()
+
+        if plan["turn_type"] == TURN_TYPE_GATHER_INFO and plan.get("question"):
+            st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+                "role": MESSAGE_ROLE_ASSISTANT,
+                "content": plan["question"],
+            })
+            log_conversation_turn(
+                st.session_state["session_id"], "guided", TURN_TYPE_GATHER_INFO,
+                question, plan["question"],
+            )
+
+        elif plan["turn_type"] == TURN_TYPE_RUN_PVMAPS:
+            try:
+                run_recommended_pvmaps_estimate(
+                    st.session_state,
+                    api_key,
+                    location_context,
+                    latest_user_message=question,
+                )
+                log_conversation_turn(
+                    st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
+                    question, "PVMAPS estimate generated",
+                )
+            except Exception as error:
+                st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+                    "role": MESSAGE_ROLE_ASSISTANT,
+                    "content": "I tried to run a solar-yield estimate, but PVMAPS could not complete the simulation. We can keep discussing the setup and assumptions.",
+                })
+                add_llm_trace(
+                    st.session_state,
+                    "pvmaps_background_tool",
+                    input_summary={SESSION_KEY_LOCATION_CONTEXT: location_context},
+                    output={"error": str(error)},
+                    decision="estimate_failed",
+                )
+                log_conversation_turn(
+                    st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
+                    question, "PVMAPS simulation failed",
+                )
+
+        else:
+            pvmaps_runs = st.session_state.get(SESSION_KEY_PVMAPS_RUNS, [])
+            latest_pvmaps_output = pvmaps_runs[-1]["output"] if pvmaps_runs else None
+
+            retrieved_context = []
+            try:
+                rag_plan = decide_rag_source(
+                    question,
+                    api_key,
+                    conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
+                )
+                add_llm_trace(
+                    st.session_state,
+                    "rag_source_router",
+                    input_summary={"question": question},
+                    output=rag_plan,
+                    decision=rag_plan["source"],
+                )
+                retrieved_context = retrieve_for_source(rag_plan["source"], question)
+                add_llm_trace(
+                    st.session_state,
+                    "rag_retrieval",
+                    input_summary={"question": question, "source": rag_plan["source"]},
+                    output={
+                        "retrieved_count": len(retrieved_context),
+                        "chunks": summarize_retrieved_chunks(retrieved_context),
+                    },
+                    decision="chunks_retrieved" if retrieved_context else "no_chunks_found",
+                )
+            except Exception as error:
+                add_llm_trace(
+                    st.session_state,
+                    "rag_source_router",
+                    input_summary={"question": question},
+                    output={"error": str(error)},
+                    decision="rag_skipped_due_to_error",
+                )
+
+            answer = answer_general_agpv_question(
+                question,
+                api_key,
+                user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
+                location_context=location_context,
+                pvmaps_state=st.session_state.get(SESSION_KEY_QUESTIONNAIRE_STATE),
+                latest_pvmaps_output=latest_pvmaps_output,
+                latest_pvmaps_run=pvmaps_runs[-1] if pvmaps_runs else None,
+                conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
+                retrieved_context=retrieved_context,
+            )
+            add_llm_trace(
+                st.session_state,
+                "general_agpv_answerer",
+                input_summary={
+                    "question": question,
+                    SESSION_KEY_USER_PROFILE: st.session_state.get(SESSION_KEY_USER_PROFILE),
+                    SESSION_KEY_LOCATION_CONTEXT: location_context,
+                    "conversation_history": st.session_state[SESSION_KEY_CHAT_MESSAGES],
+                    "retrieved_context_count": len(retrieved_context),
+                    "latest_pvmaps_run": {
+                        key: pvmaps_runs[-1].get(key)
+                        for key in ("input", "output", "input_provenance", "location_context")
+                    } if pvmaps_runs else None,
+                },
+                output={"answer": answer},
+                decision="answered_general_question",
+            )
+            st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+                "role": MESSAGE_ROLE_ASSISTANT,
+                "content": answer,
+            })
+            log_conversation_turn(
+                st.session_state["session_id"], "guided", "general_question",
+                question, answer, retrieved_chunks=retrieved_context,
+            )
 
     st.rerun()
