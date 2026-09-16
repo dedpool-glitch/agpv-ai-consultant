@@ -83,6 +83,7 @@ def format_input_field_descriptions(pvmaps_input):
         return ""
 
     lines = []
+    array_config = (pvmaps_input.get("array") or {}).get("config")
     for field in get_pvmaps_input_descriptors():
         field_id = field["id"]
         value, present = _get_nested_input_value(pvmaps_input, field_id)
@@ -90,7 +91,10 @@ def format_input_field_descriptions(pvmaps_input):
             continue
         unit = field.get("unit")
         unit_text = f" {unit}" if unit else ""
-        lines.append(f"- {field_id} ({field['name']}) = {value}{unit_text}: {field['description']}")
+        description = field["description"]
+        if field_id == "array.tilt" and array_config in ("tracking", "GSVBF"):
+            description += " This recorded value is not used for this run and must not be described as the array's operating tilt."
+        lines.append(f"- {field_id} ({field['name']}) = {value}{unit_text}: {description}")
 
     if not lines:
         return ""

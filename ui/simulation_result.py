@@ -62,6 +62,8 @@ def configuration_rows(run):
         notes = origin.get("justification") or ""
         if field_id == "array.gsHeight" and inputs.get("array", {}).get("config") != "GSVBF":
             notes = "Not used for this array configuration."
+        if field_id == "array.tilt" and inputs.get("array", {}).get("config") in ("tracking", "GSVBF"):
+            notes = "Recorded input; not used for this array configuration."
         rows.append({
             "Parameter": field["name"],
             "Value": format_value(value),

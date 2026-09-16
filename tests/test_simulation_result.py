@@ -42,6 +42,13 @@ class SimulationResultTests(unittest.TestCase):
         self.assertEqual([r["Origin"] for r in configuration_rows(run)],
                          ["Stored panel specifications", "Application default"])
 
+    def test_tilt_is_marked_unused_for_tracking_and_gsvbf(self):
+        for config in ("tracking", "GSVBF"):
+            run = {"input": {"array": {"config": config, "tilt": 25}}}
+            tilt = next(row for row in configuration_rows(run)
+                        if row["Parameter"] == "Array Tilt")
+            self.assertIn("not used", tilt["Recorded rationale / notes"].lower())
+
     def test_location_is_from_run_with_coordinate_fallback(self):
         run = {"input": {"lat": 40.419, "lon": -86.891}}
         self.assertEqual(run_location(run), "Latitude 40.42, longitude -86.89")

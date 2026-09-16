@@ -59,6 +59,7 @@ from services.llm_trace import add_llm_trace
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 from ui.simulation_result import render_simulation_result
 from ui.simulation_comparison import render_simulation_comparison
+from ui.simulation_export import render_simulation_exports
 
 load_dotenv()
 st.set_page_config(layout="wide")
@@ -113,11 +114,13 @@ def _descriptor_label(field):
     return f"{field['name']} ({unit})" if unit and unit != "1" else field["name"]
 
 # Render the forms based on model description provided in pvmaps.json 
-def _render_descriptor_input(field, container=st):
+def _render_descriptor_input(field, container=st, disabled=False):
     constraints = field.get("constraints") or {}
     metadata = field.get("metadata") or {}
     allowed_values = constraints.get("allowed_values")
     label = _descriptor_label(field)
+    if disabled:
+        label += " (not used for this setup)"
     help_text = field.get("description") or None
     default = field.get("default")
 
@@ -149,6 +152,7 @@ def _render_descriptor_input(field, container=st):
         "step": step,
         "help": help_text,
         "key": f"expert_{field['id']}",
+        "disabled": disabled,
     }
     if metadata.get("format"):
         number_options["format"] = metadata["format"]
@@ -241,7 +245,13 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                 row_fields = fields_of_one_kind[row_start:row_start + FIELDS_PER_ROW]
                 row_columns = st.columns(FIELDS_PER_ROW)
                 for column, field in zip(row_columns, row_fields):
-                    expert_form_values[field["id"]] = _render_descriptor_input(field, column)
+                    expert_form_values[field["id"]] = _render_descriptor_input(
+                        field, column,
+                        disabled=(
+                            field["id"] == "array.tilt"
+                            and expert_form_values.get("array.config") in ("tracking", "GSVBF")
+                        ),
+                    )
 
     if st.button(EXPERT_MODE_TEXT["run_button"]):
         if not expert_location_context:
@@ -293,6 +303,7 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
 
         st.subheader(EXPERT_MODE_TEXT["explanation_header"])
         st.write(expert_last_run["explanation"])
+        render_simulation_exports([expert_last_run], "expert")
 
         # Follow-up chat about this specific run, grounded in the same
         # input/output plus RAG context -- resets whenever a new run
@@ -461,6 +472,7 @@ for message in st.session_state[SESSION_KEY_CHAT_MESSAGES]:
         st.write(message["content"])
 
 render_simulation_comparison(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []))
+render_simulation_exports(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []), "guided")
 
 question = st.chat_input(CHAT_UI_TEXT["answer_label"], key="chat_input")
 if question:
