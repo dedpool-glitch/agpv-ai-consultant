@@ -136,12 +136,52 @@ making the conversation end after one simulation.
 
 ## Development Targets
 
-- Integrate the CEED paper RAG pipeline into the app through a routing step, so
-  RAG is used only for research/background questions.
-- Refactor the chat flow so PVMAPS is one optional tool, not the required end
-  point of every conversation.
-- Extend the backend so the app can run and compare multiple PVMAPS simulations
-  during one consultation.
-- Prepare for a quick solar-yield ML model as a second estimate tool.
-- Deploy the prototype for lab access, preferably through Purdue RCAC or a lab
-  server.
+The guided conversation, routed research retrieval, optional PVMAPS runs, and
+saved-run comparison are implemented. The next tasks focus on making their
+results easier to inspect and evaluating their quality.
+
+### Near term
+
+- [x] Add one per-session Excel download for successful PVMAPS runs. The Runs
+  sheet contains run ID, location, finalized inputs and their origins,
+  annual/monthly yield, and units; Daily yield contains ordered day indices and
+  values. Exports use saved data and do not need an LLM request.
+- [ ] Save each completed simulation before requesting its LLM explanation, so
+  an API timeout cannot discard the result.
+- [ ] Create a paired RAG-on/RAG-off evaluation using the same logged user
+  questions, model, prompt, and conversation context. Record both answers and
+  retrieved sources; score answer quality and support with a human-reviewed
+  rubric rather than text similarity alone.
+- [ ] Add a test-only RAG toggle to make paired evaluation reproducible.
+- [ ] Confirm the GenAI Studio models available to users, add a model selector,
+  and record the model used with each response. Hold the model fixed in RAG
+  comparisons.
+- [ ] Pass the user's selected simulation comparison to chat so follow-up
+  answers can discuss the actual runs, reference run, changed inputs, and
+  calculated differences.
+- [ ] Ask for missing site or equipment evidence before making practical
+  suitability claims; evaluate responses against real user questions.
+
+### Student access and evaluation
+
+- [ ] Clarify whether the proposed local distribution is a Windows executable,
+  Python package, or repository setup script; verify the separate MATLAB,
+  MATLAB Engine, PVMAPS, and license requirements for that route.
+- [ ] After the install route is verified, write the student setup guide and
+  record a short installation and usage demo.
+- [ ] Benchmark retrieval on representative questions before adding query
+  rewriting. Test whether relevant conversation context improves the retrieved
+  evidence.
+- [ ] Test the report and comparison workflow with target users. Record where
+  they misunderstand assumptions, units, or supported conclusions.
+
+### Later extensions
+
+- [ ] Add saved-run history and comparison to expert mode.
+- [ ] Extract and validate panel specifications from uploaded datasheets.
+- [ ] Assess additional PVMAPS outputs and plots only where they support a user
+  decision, including power profiles and tracking angles when applicable.
+- [ ] Integrate and evaluate the group's quick solar-yield ML model as a second
+  estimate tool.
+- [ ] Plan Purdue-restricted hosting with RCAC, including allocation, MATLAB
+  licensing, access controls, and API-key handling.
