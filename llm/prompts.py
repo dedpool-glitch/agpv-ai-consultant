@@ -48,6 +48,7 @@ Scope guardrails:
 - Do not estimate or imply crop yield, cost, profit, or payback — this simulation only models solar yield.
 - Do not make recommendations beyond what the output supports.
 - One configuration's output does not establish optimality, sensitivity, or superiority over another configuration. Do not attribute a measured effect to tilt, spacing, or albedo without a supplied comparison that supports that attribution.
+- For tracking or GSVBF, a submitted tilt value is ignored. Do not present it as the operating panel angle or a cause of the simulated yield.
 - Separate observed simulation patterns from possible physical explanations. Research excerpts may explain a mechanism but do not prove that it caused this run's result, or that a published gain applies to this site.
 - Surface material warnings from the output. Do not invent confidence levels or imply that an absence of warnings validates real-world performance.
 
@@ -270,89 +271,17 @@ Rules:
 - Respect values already provided in the current PVMAPS state. Do not change a field that is already set UNLESS the latest user message (provided below) explicitly asks for a different value for that specific field — e.g. "use tracking instead," "try more row spacing." In that case, use the new value and say so plainly in that field's justification (e.g. "Changed from fixed-tilt to tracking because you asked to try tracking instead.").
 - Never change an already-set field based on a vague or general question (e.g. a question about what a value means, or why it was chosen) — only an explicit request for a different value justifies a change.
 - Recommend missing values using the user profile, location context, and consultation history — ground every choice in what is actually known about this user's land, goal, and profile rather than a generic default whenever the context supports something more specific.
-- If the user prioritizes farming operations, choose conservative layout assumptions such as practical spacing/elevation and explain that choice.
+- If the user prioritizes farming operations, consider spacing and elevation that could support those goals, but label them as provisional. Without equipment dimensions or access constraints, do not claim a selected pitch or elevation provides adequate clearance.
 - Do not claim crop yield, cost, profit, or payback is modeled.
 - Do not include fields outside the required JSON.
-- Justifications must reference the specific context provided (location, profile, stated concerns) whenever relevant. Avoid generic phrases like "typical value" with nothing behind them.
+- Justifications must distinguish user facts, retrieved evidence, and provisional assumptions. Reference specific context when it actually supports a choice; do not turn a location or broad goal into an unsupported claim that a number is optimal.
+- Recommend one valid configuration for simulation, not an optimized design. Do not claim PVMAPS searched, compared, or proved the selected values before this run.
 - array_elevation must be greater than half the module height.
 - If using default panel specs, module height is 4.8 m, so array_elevation must be greater than 2.4 m.
-- "Relevant research context" below may or may not be provided. If it contains excerpts that actually support a specific value (e.g. a finding about optimal pitch, tilt, or spacing), ground that field's justification in it and briefly name the source (e.g. "Khan et al. found closely spaced rows improve yield at this latitude"). If the context is empty or doesn't clearly support a specific value, use your own general knowledge as usual — do not force a citation that isn't actually relevant, and do not treat the absence of context as an error.
+- PVMAPS requires a valid tilt number in every input, but tilt is ignored for tracking and GSVBF. For those setups, explain that the recorded number is not used; do not justify it as a yield-driving design choice.
+- Ground-sculpting height is used only for GSVBF. For other configurations, provide a valid recorded value and explain that it is not used for the run.
+- "Relevant research context" may be empty. Cite a source for a selected value only when an excerpt actually supports that choice. Otherwise present the value as a provisional assumption based on general design reasoning, without inventing a citation or a site-specific finding.
 
-Example (first run, everything missing):
-
-Location context: Lafayette, Indiana (lat ~40.4)
-Current PVMAPS state: panel_model already set to "default values"; all other fields null
-Output:
-{
-  "pvmaps_inputs": {
-    "panel_model": "default values",
-    "array_config": "tracking",
-    "tilt": 25,
-    "azimuth": 90,
-    "albedo": 0.3,
-    "pitch": 11,
-    "gs_height": 0.5,
-    "array_elevation": 3
-  },
-  "justifications": {
-    "panel_model": "No datasheet was provided, so validated default module specs are used.",
-    "array_config": "Single-axis tracking is a reasonable baseline configuration for a first feasibility estimate.",
-    "tilt": "25 degrees is a typical starting tilt for a site near this latitude.",
-    "azimuth": "East-west row orientation (90) is the standard default for tracking arrays.",
-    "albedo": "0.3 reflects typical grassland ground cover under the array.",
-    "pitch": "11 meters gives enough row spacing to limit shading between tracking rows.",
-    "gs_height": "0.5 meters is a conservative default when ground sculpting isn't specified.",
-    "array_elevation": "3 meters is a proposed mounting height; equipment clearance requires a separate check."
-  },
-  "parameter_sources": {
-    "panel_model": {"source": "application_default", "user_quote": null},
-    "array_config": {"source": "llm_recommended", "user_quote": null},
-    "tilt": {"source": "llm_recommended", "user_quote": null},
-    "azimuth": {"source": "llm_recommended", "user_quote": null},
-    "albedo": {"source": "llm_recommended", "user_quote": null},
-    "pitch": {"source": "llm_recommended", "user_quote": null},
-    "gs_height": {"source": "llm_recommended", "user_quote": null},
-    "array_elevation": {"source": "llm_recommended", "user_quote": null}
-  }
-}
-
-Example (variant run — one field already set, user explicitly asks for a different value):
-
-Current PVMAPS state: array_config already set to "fixed"; tilt, azimuth, albedo, pitch, gs_height, array_elevation already set from a prior run.
-Latest user message: "Can you run that again but with single-axis tracking instead?"
-Output:
-{
-  "pvmaps_inputs": {
-    "panel_model": "default values",
-    "array_config": "tracking",
-    "tilt": 25,
-    "azimuth": 90,
-    "albedo": 0.3,
-    "pitch": 11,
-    "gs_height": 0.5,
-    "array_elevation": 3
-  },
-  "justifications": {
-    "panel_model": "Unchanged from the prior run.",
-    "array_config": "Changed from fixed to tracking because you asked to try tracking instead.",
-    "tilt": "Unchanged from the prior run.",
-    "azimuth": "Unchanged from the prior run.",
-    "albedo": "Unchanged from the prior run.",
-    "pitch": "Unchanged from the prior run.",
-    "gs_height": "Unchanged from the prior run.",
-    "array_elevation": "Unchanged from the prior run."
-  },
-  "parameter_sources": {
-    "panel_model": {"source": "application_default", "user_quote": null},
-    "array_config": {"source": "user_provided", "user_quote": "Can you run that again but with single-axis tracking instead?"},
-    "tilt": {"source": "inherited", "user_quote": null},
-    "azimuth": {"source": "inherited", "user_quote": null},
-    "albedo": {"source": "inherited", "user_quote": null},
-    "pitch": {"source": "inherited", "user_quote": null},
-    "gs_height": {"source": "inherited", "user_quote": null},
-    "array_elevation": {"source": "inherited", "user_quote": null}
-  }
-}
 """
 
 LLM_SYSTEM_RAG_SOURCE_ROUTER_PROMPT = """
