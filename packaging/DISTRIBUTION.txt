@@ -1,0 +1,30 @@
+AgPV Assistant - portable Windows application
+
+Keep this entire folder together and extract it to a writable location.
+Run AgPV-Assistant.exe from a terminal or double-click it. The interface opens
+in your browser. Server URLs, simulation output, and errors remain in the console.
+Press Ctrl+C in the console to stop the server.
+
+MATLAB R2026a is required for the initial build (including a valid license and
+the toolboxes required by PVMAPS). MATLAB Runtime alone is insufficient.
+This prototype expects MATLAB at C:\Program Files\MATLAB\R2026a.
+The build-info.json records the actual Engine and dependency versions.
+Internet access and a Purdue GenAI Studio API key are required for AI features.
+Enter the key in the browser, or supply your own .env beside the executable.
+No API key is included. Existing application conversation logging is retained.
+
+Outputs are saved under application/outputs. Chroma data is under
+application/data/chroma_db. PVMAPS may write into application/models/pvmaps/bin.
+Back up those locations before replacing this distribution with a new build.
+The default embedding model may download on the first retrieval request.
+PDF ingestion tools are not included; the existing retrieval index is included.
+
+Pass Streamlit options as usual, e.g.:
+  AgPV-Assistant.exe --server.port=8502 --server.headless=true
+
+Run AgPV-Assistant.exe --self-test for offline app/data checks and a MATLAB
+arithmetic check. This starts and quits MATLAB but does not run a full simulation.
+See VALIDATION.md for completed checks and remaining limitations.
+
+See build-info.json: obfuscated=false means the Python sources are readable.
+Obfuscation does not protect MATLAB scripts or data and is not a secrecy guarantee.

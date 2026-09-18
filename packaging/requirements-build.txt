@@ -1,0 +1,7 @@
+pyinstaller==6.22.3
+pyarmor==9.2.7
+# Chroma's default embedding function requires this at runtime.
+onnxruntime==1.30.0
+# Install the pip wheel locally even if Conda supplies this version: its shared
+# abseil/grpc DLLs conflict with MATLAB R2026a.
+grpcio==1.82.1
