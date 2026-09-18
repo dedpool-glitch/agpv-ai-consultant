@@ -146,8 +146,24 @@ results easier to inspect and evaluating their quality.
   sheet contains run ID, location, finalized inputs and their origins,
   annual/monthly yield, and units; Daily yield contains ordered day indices and
   values. Exports use saved data and do not need an LLM request.
+- [x] Place one results-download control after the simulation explanation so it
+  does not interrupt the result, assumptions, and explanation flow.
+- [x] Disable the expert-mode tilt control for tracking and GSVBF, mark the
+  retained schema value as unused in reports, and prevent explanations from
+  presenting it as an operating angle.
+- [x] Generalize the PVMAPS recommender prompt by removing example numbers that
+  could anchor recommendations and by labeling unsupported choices as
+  provisional assumptions rather than optimized values.
 - [ ] Save each completed simulation before requesting its LLM explanation, so
   an API timeout cannot discard the result.
+- [ ] Move conditional parameter rules, such as tilt applying only to fixed
+  arrays and ground-sculpting height applying only to GSVBF, into the shared
+  PVMAPS descriptor. Derive recommender schema context and UI behavior from that
+  descriptor instead of maintaining duplicate rules in prompts and constants.
+- [ ] Evaluate the recommender on a fixed set of varied locations, user goals,
+  and fixed/tracking/GSVBF requests. Check schema validity, parameter
+  applicability, provenance, unsupported optimization claims, and whether
+  different contexts produce appropriately different configurations.
 - [ ] Create a paired RAG-on/RAG-off evaluation using the same logged user
   questions, model, prompt, and conversation context. Record both answers and
   retrieved sources; score answer quality and support with a human-reviewed

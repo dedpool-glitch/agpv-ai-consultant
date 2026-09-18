@@ -65,6 +65,8 @@ load_dotenv()
 st.set_page_config(layout="wide")
 st.title(APP_TITLE)
 
+PENDING_CHAT_QUESTION_KEY = "pending_chat_question"
+
 # One id per browser session, used only to group conversation_log.jsonl rows
 # back into a single conversation later -- not tied to any account/identity.
 st.session_state.setdefault("session_id", uuid.uuid4().hex)
@@ -112,6 +114,16 @@ if not api_key:
 def _descriptor_label(field):
     unit = field.get("unit")
     return f"{field['name']} ({unit})" if unit and unit != "1" else field["name"]
+
+
+def _chat_api_error_message(error):
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code in (401, 403):
+        return "The AI service rejected the API key. Please check your Purdue GenAI API key and try again."
+    if status_code == 429:
+        return "The AI service rate limit was reached. Please wait briefly and try again."
+    return "The AI service could not respond. Your message has been kept; please try again shortly."
 
 # Render the forms based on model description provided in pvmaps.json 
 def _render_descriptor_input(field, container=st, disabled=False):
@@ -474,24 +486,42 @@ for message in st.session_state[SESSION_KEY_CHAT_MESSAGES]:
 render_simulation_comparison(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []))
 render_simulation_exports(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []), "guided")
 
-question = st.chat_input(CHAT_UI_TEXT["answer_label"], key="chat_input")
-if question:
+submitted_question = st.chat_input(CHAT_UI_TEXT["answer_label"], key="chat_input")
+if submitted_question:
     st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
         "role": MESSAGE_ROLE_USER,
-        "content": question,
+        "content": submitted_question,
     })
+    st.session_state[PENDING_CHAT_QUESTION_KEY] = submitted_question
+    st.rerun()
 
-    with st.chat_message(MESSAGE_ROLE_USER):
-        st.write(question)
+question = st.session_state.get(PENDING_CHAT_QUESTION_KEY)
+if question:
 
     with st.spinner(CHAT_UI_TEXT["thinking_message"]):
-        plan = route_conversation_turn(
-            api_key,
-            user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
-            location_context=location_context,
-            conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
-            pvmaps_runs=st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
-        )
+        try:
+            plan = route_conversation_turn(
+                api_key,
+                user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
+                location_context=location_context,
+                conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
+                pvmaps_runs=st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
+            )
+        except Exception as error:
+            error_message = _chat_api_error_message(error)
+            st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+                "role": MESSAGE_ROLE_ASSISTANT,
+                "content": error_message,
+            })
+            add_llm_trace(
+                st.session_state,
+                "turn_router",
+                input_summary={"question": question},
+                output={"error": str(error)},
+                decision="router_request_failed",
+            )
+            st.session_state.pop(PENDING_CHAT_QUESTION_KEY, None)
+            st.rerun()
         add_llm_trace(
             st.session_state,
             "turn_router",
@@ -534,6 +564,7 @@ if question:
                     output={"error": str(error)},
                     decision="location_update_failed",
                 )
+                st.session_state.pop(PENDING_CHAT_QUESTION_KEY, None)
                 st.rerun()
 
         if plan["turn_type"] == TURN_TYPE_GATHER_INFO and plan.get("question"):
@@ -613,17 +644,27 @@ if question:
                     decision="rag_skipped_due_to_error",
                 )
 
-            answer = answer_general_agpv_question(
-                question,
-                api_key,
-                user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
-                location_context=location_context,
-                pvmaps_state=st.session_state.get(SESSION_KEY_QUESTIONNAIRE_STATE),
-                latest_pvmaps_output=latest_pvmaps_output,
-                latest_pvmaps_run=pvmaps_runs[-1] if pvmaps_runs else None,
-                conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
-                retrieved_context=retrieved_context,
-            )
+            try:
+                answer = answer_general_agpv_question(
+                    question,
+                    api_key,
+                    user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
+                    location_context=location_context,
+                    pvmaps_state=st.session_state.get(SESSION_KEY_QUESTIONNAIRE_STATE),
+                    latest_pvmaps_output=latest_pvmaps_output,
+                    latest_pvmaps_run=pvmaps_runs[-1] if pvmaps_runs else None,
+                    conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
+                    retrieved_context=retrieved_context,
+                )
+            except Exception as error:
+                answer = _chat_api_error_message(error)
+                add_llm_trace(
+                    st.session_state,
+                    "general_agpv_answerer",
+                    input_summary={"question": question},
+                    output={"error": str(error)},
+                    decision="answer_request_failed",
+                )
             add_llm_trace(
                 st.session_state,
                 "general_agpv_answerer",
@@ -650,4 +691,5 @@ if question:
                 question, answer, retrieved_chunks=retrieved_context,
             )
 
+    st.session_state.pop(PENDING_CHAT_QUESTION_KEY, None)
     st.rerun()
