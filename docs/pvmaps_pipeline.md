@@ -222,19 +222,25 @@ array.elevation = 3
 
 ## Known Issue
 
-The `fixed` configuration produced:
+The bundled protected simulator currently produces the following error for
+`GSVBF` runs:
 
 ```text
 Unrecognized function or variable 'I_gnd_x'
 ```
 
-This does not necessarily mean fixed systems are unsupported. It means:
+Controlled tests reproduced the failure across multiple cell technologies,
+quick and full simulation modes, and light-pattern settings. The failure is
+inside the protected PVMAPS implementation, not the Python input mapping.
+Fixed and tracking runs remain available in the app.
+
+This does not mean GSVBF is unsupported by PVMAPS generally. It means:
 
 ```text
-fixed + current defaults
+GSVBF + current bundled PVMAPS build
 ```
 
-is not yet confirmed as a valid input combination.
+is reproducibly incompatible with this bundled build.
 
 ## Demo Scripts
 
