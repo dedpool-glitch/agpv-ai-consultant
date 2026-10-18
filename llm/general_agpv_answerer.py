@@ -1,7 +1,7 @@
 import json
 
 from llm.prompts import LLM_SYSTEM_GENERAL_AGPV_PROMPT
-from llm.client import call_llm
+from llm.client import DEFAULT_MODEL, call_llm
 from llm.rag_formatting import format_retrieved_context
 from llm.output_generator import format_input_field_descriptions
 
@@ -16,6 +16,8 @@ def answer_general_agpv_question(
     conversation_history=None,
     retrieved_context=None,
     latest_pvmaps_run=None,
+    model=DEFAULT_MODEL,
+    temperature=None,
 ):
     run_section = ""
     if latest_pvmaps_run:
@@ -61,5 +63,10 @@ def answer_general_agpv_question(
         },
     ]
 
-    response = call_llm(messages, api_key)
+    response = call_llm(
+        messages,
+        api_key,
+        model=model,
+        temperature=temperature,
+    )
     return response.strip()

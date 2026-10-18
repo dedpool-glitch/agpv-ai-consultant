@@ -8,7 +8,7 @@ from rag.pipeline import summarize_retrieved_chunks
 
 # How much of each retrieved chunk's text to keep in the log -- enough to see
 # what kind of passage matched without bloating every row with full chunk text.
-CHUNK_TEXT_PREVIEW_LENGTH = 150
+CHUNK_TEXT_PREVIEW_LENGTH = 1000
 
 CONVERSATION_LOG_PATH = OUTPUT_DIR / "conversation_log.jsonl"
 
@@ -18,8 +18,7 @@ CONVERSATION_LOG_PATH = OUTPUT_DIR / "conversation_log.jsonl"
 # Students running the app locally never see or do anything either way; this
 # is what makes logging work for non-technical users without asking them to
 # find or upload a file themselves.
-REMOTE_LOG_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbxEZQb4kV9OnraZBGz3NTKcOu5QhGcHWKvX9cthXtuOzBdpQqrLsLOoOxr9fk-qf69t/exec"
-
+REMOTE_LOG_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbxdsde9v7YdLzDX8Oq6GZiMIHBdLto3XPAYX9fsFfRAw35viA0hGbAVpWFNHc3fsvxK/exec"
 # Keep this short -- a slow/unreachable endpoint should never make a student
 # wait on a request they don't even know is happening.
 REMOTE_LOG_TIMEOUT_SECONDS = 4
@@ -63,6 +62,7 @@ def log_conversation_turn(session_id, mode, turn_type, question, answer, extra=N
        briefly down. One JSON object per line, so it's trivial to load into
        pandas (pd.read_json(path, lines=True)) or scan by eye.
     """
+    chunks = retrieved_chunks or []
     row = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "session_id": session_id,
@@ -70,10 +70,20 @@ def log_conversation_turn(session_id, mode, turn_type, question, answer, extra=N
         "turn_type": turn_type,
         "question": question,
         "answer": answer,
+        # A fixed schema makes exported Sheet rows directly comparable. Zero
+        # chunks now means no retrieval, rather than a missing logging field.
+        "model_name": None,
+        "user_profile": None,
+        "location_context": None,
+        "rag_enabled": False,
+        "rag_source": "none",
+        "rag_router_reason": None,
+        "retrieval_query": None,
+        "retrieved_count": len(chunks),
+        "retrieved_chunks": _compact_chunk_summary(chunks),
+        "response_time_ms": None,
+        "error": None,
     }
-    if retrieved_chunks is not None:
-        row["retrieved_count"] = len(retrieved_chunks)
-        row["retrieved_chunks"] = _compact_chunk_summary(retrieved_chunks)
     if extra:
         row.update(extra)
 

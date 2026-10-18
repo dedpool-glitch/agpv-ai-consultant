@@ -1,6 +1,9 @@
 import requests
 
-def call_llm(messages,api_key,model="llama4:latest",temperature=None):
+DEFAULT_MODEL = "llama4:latest"
+
+
+def call_llm(messages,api_key,model=DEFAULT_MODEL,temperature=None):
     url="https://genai.rcac.purdue.edu/api/chat/completions"
 
     headers={
@@ -20,4 +23,3 @@ def call_llm(messages,api_key,model="llama4:latest",temperature=None):
     response.raise_for_status()
 
     return response.json()["choices"][0]["message"]["content"]
-
