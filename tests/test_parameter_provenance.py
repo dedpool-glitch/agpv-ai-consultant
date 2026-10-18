@@ -5,7 +5,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-from constants import QUESTIONNAIRE_DEFAULTS
+from constants import PROCESSING_STATUS_TEXT, QUESTIONNAIRE_DEFAULTS
 from questionnaire.state import initialize_questionnaire_state
 from services.parameter_provenance import build_parameter_provenance
 
@@ -126,6 +126,30 @@ class ProvenanceFlowTests(unittest.TestCase):
             ))
             run.assert_not_called()
             self.assertNotIn("parameter_provenance", baseline)
+
+    def test_recommended_run_reports_real_processing_stages(self):
+        state = {"chat_messages": []}
+        candidate = {"pvmaps_inputs": dict(QUESTIONNAIRE_DEFAULTS)}
+        stages = []
+
+        with patch.object(self.service, "retrieve_recommendation_context", return_value=[]), \
+             patch.object(self.service, "generate_recommended_pvmaps_config", return_value=candidate), \
+             patch.object(self.service, "run_pvmaps", return_value={"yearly_yield": 100}), \
+             patch.object(self.service, "explain_output", return_value="Explanation"):
+            self.assertTrue(self.service.run_recommended_pvmaps_estimate(
+                state,
+                "unused",
+                {"latitude": 40, "longitude": -86},
+                status_callback=stages.append,
+            ))
+
+        self.assertEqual(stages, [
+            PROCESSING_STATUS_TEXT["retrieval"],
+            PROCESSING_STATUS_TEXT["configuration"],
+            PROCESSING_STATUS_TEXT["validation"],
+            PROCESSING_STATUS_TEXT["simulation"],
+            PROCESSING_STATUS_TEXT["explanation"],
+        ])
 
     def test_explainer_receives_metadata_and_allows_older_callers(self):
         origins = {"parameters": {"pitch": {"source": "user_provided", "value": 12}}}

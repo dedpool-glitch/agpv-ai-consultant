@@ -82,3 +82,12 @@ def test_descriptor_cross_field_rule_is_applied():
     errors = validate_pvmaps_descriptor_input(pvmaps_input)
 
     assert "Array Elevation must be greater than half the Module Height." in errors
+
+
+def test_descriptor_validation_rejects_temporarily_unavailable_gsvbf():
+    pvmaps_input = _default_descriptor_input()
+    pvmaps_input["array"]["config"] = "GSVBF"
+
+    errors = validate_pvmaps_descriptor_input(pvmaps_input)
+
+    assert any("temporarily unavailable" in error for error in errors)

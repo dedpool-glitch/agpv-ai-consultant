@@ -9,6 +9,7 @@ from constants import (
     SESSION_KEY_PVMAPS_RUNS,
     SESSION_KEY_QUESTIONNAIRE_STATE,
     SESSION_KEY_USER_PROFILE,
+    PROCESSING_STATUS_TEXT,
 )
 from llm.candidate_config_validator import validate_candidate_config
 from llm.output_generator import explain_output
@@ -50,6 +51,7 @@ def run_recommended_pvmaps_estimate(
     location_context,
     latest_user_message=None,
     run_label=None,
+    status_callback=None,
 ):
     """
     Run one PVMAPS solar-yield estimate and append it to session_state[SESSION_KEY_PVMAPS_RUNS].
@@ -81,6 +83,8 @@ def run_recommended_pvmaps_estimate(
         SESSION_KEY_CHAT_MESSAGES: session_state.get(SESSION_KEY_CHAT_MESSAGES, []),
     }
 
+    if status_callback:
+        status_callback(PROCESSING_STATUS_TEXT["retrieval"])
     retrieved_context = retrieve_recommendation_context(session_state, latest_user_message)
     add_llm_trace(
         session_state,
@@ -93,6 +97,8 @@ def run_recommended_pvmaps_estimate(
         decision="context_retrieved" if retrieved_context else "no_context_found",
     )
 
+    if status_callback:
+        status_callback(PROCESSING_STATUS_TEXT["configuration"])
     recommendation = generate_recommended_pvmaps_config(
         api_key,
         user_profile=session_state.get(SESSION_KEY_USER_PROFILE),
@@ -102,6 +108,8 @@ def run_recommended_pvmaps_estimate(
         latest_user_message=latest_user_message,
         retrieved_context=retrieved_context,
     )
+    if status_callback:
+        status_callback(PROCESSING_STATUS_TEXT["validation"])
     parsed_recommendation, recommendation_errors = validate_candidate_config(recommendation)
     add_llm_trace(
         session_state,
@@ -180,10 +188,14 @@ def run_recommended_pvmaps_estimate(
     input_provenance = build_report_provenance(parameter_provenance, pvmaps_input)
     report_history = copy.deepcopy(session_state[SESSION_KEY_CHAT_MESSAGES])
 
+    if status_callback:
+        status_callback(PROCESSING_STATUS_TEXT["simulation"])
     output = run_pvmaps(
         pvmaps_input,
         PVMAPS_SCRIPT_PATH
     )
+    if status_callback:
+        status_callback(PROCESSING_STATUS_TEXT["explanation"])
     explanation = explain_output(
         output,
         api_key,

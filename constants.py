@@ -103,10 +103,23 @@ QUESTIONNAIRE_UI_TEXT = {
 }
 
 CHAT_UI_TEXT = {
-    "thinking_message": "Thinking...",
     "description": "",
     "answer_label": "Ask a question, or tell me about your project",
     "opening_message": "Hi! Ask me anything about agrivoltaics, or tell me about your project and I can put together a solar-yield estimate when you're ready.",
+}
+
+PROCESSING_STATUS_TEXT = {
+    "routing": "Understanding your request...",
+    "location": "Confirming the location...",
+    "rag_routing": "Checking whether research sources are needed...",
+    "retrieval": "Searching research sources...",
+    "configuration": "Preparing simulation inputs...",
+    "validation": "Validating the configuration...",
+    "simulation": "Running PVMAPS...",
+    "explanation": "Interpreting the results...",
+    "answer": "Preparing the response...",
+    "complete": "Complete",
+    "failed": "The request could not be completed.",
 }
 
 PVMAPS_RUN_TEXT = {
@@ -147,6 +160,13 @@ PANEL_DEFAULT_SPECS = {
 
 ALLOWED_CELL_TECH = ["AL_BSF", "BI_PERC", "SHJ", "PVK_SI_2T", "PVK_SI_4T", "SHJ_NN"]
 ARRAY_CONFIG_OPTIONS = ["fixed", "tracking", "GSVBF"]
+UNAVAILABLE_ARRAY_CONFIGS = {
+    "GSVBF": (
+        "GSVBF is temporarily unavailable in the bundled PVMAPS build because "
+        "its protected ground-irradiance routine fails to initialize I_gnd_x. "
+        "Use fixed or tracking until an updated PVMAPS build is available."
+    ),
+}
 
 PVMAPS_VALIDATION_LIMITS = {
     "lat_min": -90,
@@ -172,11 +192,13 @@ PVMAPS_VALIDATION_MESSAGES = {
     "diffuse_efficiency_range": "Diffuse efficiency must be between 0 and 100 percent.",
     "tcoeff_range": "Temperature coefficient should usually be between 0 and 0.01.",
     "invalid_array_config": "Invalid tracking configuration.",
+    "unavailable_array_config": UNAVAILABLE_ARRAY_CONFIGS["GSVBF"],
     "tilt_range": "Tilt must be between 0 and 90 degrees.",
     "azimuth_range": "Azimuth must be either 90 (East-West) or 180 (North-South).",
     "albedo_range": "Albedo must be between 0 and 1.",
     "pitch_positive": "Pitch must be positive.",
     "gs_height_nonnegative": "Ground sculpting height cannot be negative.",
+    "gsvbf_gs_height_positive": "Ground sculpting height must be greater than zero for GSVBF arrays.",
     "array_elevation_nonnegative": "Array elevation cannot be negative.",
     "array_elevation_height_relation": "Array elevation must be greater than half the module height.",
     "lat_range": "Latitude must be between -90 and 90.",
@@ -303,8 +325,8 @@ RAG_SOURCE_BOTH = "both"
 RAG_SOURCES = (RAG_SOURCE_NONE, RAG_SOURCE_PAPERS, RAG_SOURCE_BOOKS, RAG_SOURCE_BOTH)
 
 # ChromaDB collection names.
-PAPERS_COLLECTION_NAME = "ceed_group_papers"
-BOOKS_COLLECTION_NAME = "ceed_group_books"
+PAPERS_COLLECTION_NAME = "ceed_group_papers_equations_v1"
+BOOKS_COLLECTION_NAME = "ceed_group_books_equations_v1"
 
 # --- Chat message shape ---
 # Roles used in st.session_state["chat_messages"] entries.

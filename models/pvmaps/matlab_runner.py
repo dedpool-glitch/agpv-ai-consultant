@@ -3,6 +3,25 @@ import os
 from pathlib import Path
 
 
+NEURAL_NETWORK_CELL_TECHNOLOGIES = {"PVK_SI_2T", "PVK_SI_4T"}
+
+
+def _validate_matlab_dependencies(eng, cell_tech):
+    """Fail clearly when a cell model needs an unavailable MATLAB toolbox."""
+    if cell_tech not in NEURAL_NETWORK_CELL_TECHNOLOGIES:
+        return
+
+    has_network_class = bool(
+        eng.eval("~isempty(which('network'))", nargout=1)
+    )
+    if not has_network_class:
+        raise RuntimeError(
+            f"{cell_tech} requires MATLAB Deep Learning Toolbox because PVMAPS "
+            "loads a saved neural-network model for this cell technology. Install "
+            "that toolbox or select AL_BSF, BI_PERC, SHJ, or SHJ_NN."
+        )
+
+
 def run_pvmaps(pvmaps_input, script_path):
     script_path = Path(script_path).resolve()
     
@@ -23,6 +42,7 @@ def run_pvmaps(pvmaps_input, script_path):
 
 
         eng.eval("input=initiate();",nargout=0)
+        _validate_matlab_dependencies(eng, pvmaps_input["module"]["cell_tech"])
         #input module fields(properties of a single solar panel)
         eng.eval(f"input.module.cell_tech='{pvmaps_input['module']['cell_tech']}';",nargout=0)
         eng.eval(f"input.module.height={pvmaps_input['module']['height']};",nargout=0)

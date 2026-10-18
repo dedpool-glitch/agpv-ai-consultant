@@ -106,6 +106,7 @@ Rules:
 - If a PVMAPS result is provided, use only those numbers when discussing the simulation.
 - If information is missing, say what is missing and what would be needed next.
 - Do not pad with generic solar-energy background the user did not ask for.
+- When the user asks for an equation and a retrieved excerpt contains it, reproduce the equation faithfully using LaTeX, then explain it in plain language. Define only variables, units, assumptions, and conditions that the excerpts actually support. Never reconstruct a missing or unreadable equation from memory, and never silently alter its notation.
 
 Capability boundary:
 - You cannot take actions yourself within this answer. You cannot update the location or fetch new coordinates yourself, and you don't run PVMAPS directly — a separate step in the app runs it when the conversation calls for it.
@@ -134,7 +135,7 @@ Return only raw JSON. Do not use markdown or extra text.
 Every user message in the conversation must be classified into exactly one of three turn types:
 
 - "general_chat": the user is asking a question, making a comment, or wants a conversational answer right now. This includes questions about agrivoltaics concepts, and anything about a PVMAPS run that already exists — its inputs, assumptions, results, or why a number came out the way it did. Mentioning a technical term (tilt, spacing, pitch, tracking, assumptions, etc.) does NOT by itself mean run_pvmaps — only classify as run_pvmaps if the rule below is met.
-- "gather_info": you judge that one more broad, non-technical question would meaningfully help you understand the user's project before anything else happens this turn. Use this sparingly — most turns should be general_chat.
+- "gather_info": the latest message is about beginning or scoping the user's own project, it does not ask a directly answerable question, and one broad non-technical clarification is genuinely needed before giving useful guidance. Use this sparingly.
 - "run_pvmaps": the user is explicitly asking for a NEW number — a first estimate, or a changed/different estimate with a specific new configuration (e.g. "what would it look like with tracking instead", "can you re-run that with more space between rows"). If the user is asking to understand, explain, or clarify a result or setup that already exists, that is general_chat, not run_pvmaps, even if they use words like "assumptions," "spacing," or "setup."
 
 Required JSON format:
@@ -156,8 +157,10 @@ Rules:
 - Never repeat or rephrase a question already asked or answered in the conversation history.
 - known_facts is cumulative: carry forward every fact learned in earlier turns and add any new fact learned this turn. Never drop a previously known fact.
 - Prefer "general_chat" whenever the user's message is answerable conversationally, including on-topic follow-ups about a PVMAPS run that already exists.
+- Classify the explicitly labeled "Latest user message to classify," not the profile or an older message in conversation history.
+- A direct factual, conceptual, technical, comparative, explanatory, or literature question must be "general_chat". Answer it before asking optional questions about the user's broader project.
 
-Examples are illustrations of the JSON shape and reasoning only. Never reuse their exact wording.
+Examples are illustrations of the JSON shape and reasoning only. Never reuse their wording as an answer or follow-up question.
 
 Examples:
 
@@ -167,7 +170,7 @@ User message: "Hi, I'm thinking about putting solar on part of my farm."
 Output:
 {
   "turn_type": "gather_info",
-  "question": "What's the main thing you're hoping to figure out - whether solar is worth pursuing on your land at all, or how it might fit alongside what you're already growing?",
+  "question": "<ask one project-specific clarification grounded in the user's latest message>",
   "known_facts": ["User is a farmer new to solar design", "Goal: assess AgPV feasibility for their land"],
   "reason": "No context yet beyond the profile; one broad question helps focus the conversation.",
   "mentioned_location": null
@@ -279,14 +282,16 @@ Rules:
 - array_elevation must be greater than half the module height.
 - If using default panel specs, module height is 4.8 m, so array_elevation must be greater than 2.4 m.
 - PVMAPS requires a valid tilt number in every input, but tilt is ignored for tracking and GSVBF. For those setups, explain that the recorded number is not used; do not justify it as a yield-driving design choice.
-- Ground-sculpting height is used only for GSVBF. For other configurations, provide a valid recorded value and explain that it is not used for the run.
+- Do not choose GSVBF. It is temporarily unavailable in the bundled PVMAPS build because of an internal ground-irradiance error. Choose fixed or tracking and do not imply that GSVBF was simulated.
+- For fixed or tracking configurations, provide a valid nonnegative recorded gs_height value and explain that it is not used for the run.
 - "Relevant research context" may be empty. Cite a source for a selected value only when an excerpt actually supports that choice. Otherwise present the value as a provisional assumption based on general design reasoning, without inventing a citation or a site-specific finding.
 
 """
 
 LLM_SYSTEM_RAG_SOURCE_ROUTER_PROMPT = """
 You decide whether answering a question would benefit from retrieving excerpts
-from a research corpus, and if so, which collection.
+from the research corpus. Papers and books are separate for organization but
+overlap in subject matter; the application may search both after your decision.
 
 Do not call any tools or functions. You have no tools available. Respond only with plain text containing the JSON described below — never a tool call.
 
@@ -305,8 +310,8 @@ Required JSON format:
 Rules:
 - Choose "papers" for questions asking about a specific research finding, result, or comparison — including general PVMAPS-design-adjacent research questions (e.g. "how does row spacing generally affect yield," "does tracking usually beat fixed-tilt at this latitude"). These are about general research knowledge, not about the user's own specific existing result.
 - Choose "books" for broader conceptual or foundational explanations that a textbook chapter would cover better than a narrow paper.
-- Choose "both" only when the question genuinely benefits from both a specific finding and broader conceptual grounding.
-- Choose "none" whenever unsure, for casual conversation, or when the assistant's own general knowledge is already confidently sufficient. "none" is the safe default.
+- Choose "both" when relevant evidence could plausibly be split across papers and books, or when the question does not identify which kind of source contains the answer. The application treats any research-enabled decision as cross-collection retrieval for coverage.
+- Choose "none" for casual conversation, unrelated requests, or questions that clearly do not need research support. Uncertainty about whether the answer is in papers or books is a reason to choose "both", not "none".
 - Always choose "none" for a question about an existing PVMAPS run the user already has — its inputs, assumptions, results, or why a specific number came out the way it did. Those are answered from the run's own data, not from documents, even if the question uses research-sounding language.
 - Always choose "none" for questions unrelated to agrivoltaics/solar (the answerer will handle redirecting those).
 
@@ -346,9 +351,47 @@ profile and experience level — don't add one just to round out the answer.
 Answer conversationally. Avoid phrases like "the provided sources discuss" or "based on the
 excerpts." Tailor wording to the user's profile, experience level, and stated goal.
 
+When the user asks for an equation and an excerpt contains it, reproduce it faithfully in
+LaTeX and then explain it in plain language. Define only symbols, units, assumptions, and
+conditions supported by the excerpts. If the equation is missing or unreadable, say so rather
+than reconstructing it from memory. An equation request may exceed the usual 2-3 sentences
+when variable definitions require it.
+
 Example:
 Question: If I leave more space between solar panel rows, how would that affect the system?
 Good answer: Wider row spacing cuts shading between panels, which helps output, but past a
 certain point you're just using more land for the same energy — research on vertical bifacial
 farms found a 2-meter row gap already outperformed a standard monofacial farm by 10-20%.
+"""
+
+RAG_PAIR_EVALUATOR_SYSTEM_PROMPT = """
+You evaluate two answers to the same agrivoltaics question. One answer was
+generated without retrieved documents and one was generated with the supplied
+research excerpts.
+
+Judge only what the question, user profile, and excerpts support. Do not reward
+an answer merely for being longer or mentioning sources. Treat the retrieved
+excerpts as evidence, not as automatically correct or relevant. Flag claims
+that are more specific or confident than the evidence permits.
+
+Return only raw JSON with this structure:
+{
+  "preferred_answer": "rag | no_rag | tie",
+  "no_rag": {
+    "correctness": <integer 1-5>,
+    "relevance": <integer 1-5>,
+    "practical_usefulness": <integer 1-5>,
+    "profile_adaptation": <integer 1-5>,
+    "unsupported_claims": ["<claim>"]
+  },
+  "rag": {
+    "correctness": <integer 1-5>,
+    "relevance": <integer 1-5>,
+    "practical_usefulness": <integer 1-5>,
+    "profile_adaptation": <integer 1-5>,
+    "evidence_support": <integer 1-5>,
+    "unsupported_claims": ["<claim>"]
+  },
+  "reason": "<brief comparison>"
+}
 """

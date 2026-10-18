@@ -3,6 +3,7 @@ from constants import (
     ARRAY_CONFIG_OPTIONS,
     PVMAPS_VALIDATION_LIMITS,
     PVMAPS_VALIDATION_MESSAGES,
+    UNAVAILABLE_ARRAY_CONFIGS,
 )
 
 
@@ -26,6 +27,8 @@ def validate_pvmaps_input(data):
 
     if data["array"]["config"] not in ARRAY_CONFIG_OPTIONS:
         errors.append(PVMAPS_VALIDATION_MESSAGES["invalid_array_config"])
+    elif data["array"]["config"] in UNAVAILABLE_ARRAY_CONFIGS:
+        errors.append(UNAVAILABLE_ARRAY_CONFIGS[data["array"]["config"]])
 
     if not (PVMAPS_VALIDATION_LIMITS["tilt_min"] <= data["array"]["tilt"] <= PVMAPS_VALIDATION_LIMITS["tilt_max"]):
         errors.append(PVMAPS_VALIDATION_MESSAGES["tilt_range"])
@@ -41,6 +44,9 @@ def validate_pvmaps_input(data):
 
     if data["array"]["gsHeight"] < 0:
         errors.append(PVMAPS_VALIDATION_MESSAGES["gs_height_nonnegative"])
+
+    if data["array"]["config"] == "GSVBF" and data["array"]["gsHeight"] <= 0:
+        errors.append(PVMAPS_VALIDATION_MESSAGES["gsvbf_gs_height_positive"])
 
     if data["array"]["elevation"] < 0:
         errors.append(PVMAPS_VALIDATION_MESSAGES["array_elevation_nonnegative"])

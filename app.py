@@ -2,6 +2,7 @@ import streamlit as st
 import copy
 import json
 import os
+import time
 import uuid
 from dotenv import load_dotenv
 
@@ -28,6 +29,7 @@ from constants import (
     MESSAGE_ROLE_ASSISTANT,
     MESSAGE_ROLE_USER,
     MESSAGE_TYPE_PVMAPS_RUN,
+    PROCESSING_STATUS_TEXT,
     SESSION_KEY_API_KEY,
     SESSION_KEY_APP_MODE,
     SESSION_KEY_CHAT_MESSAGES,
@@ -39,11 +41,13 @@ from constants import (
     SESSION_KEY_USER_PROFILE,
     TURN_TYPE_GATHER_INFO,
     TURN_TYPE_RUN_PVMAPS,
+    UNAVAILABLE_ARRAY_CONFIGS,
 )
 
 
 from services.location_geocoder import geocode_location
 from llm.consultation_planner import route_conversation_turn
+from llm.client import DEFAULT_MODEL
 from llm.expert_followup_answerer import answer_expert_followup_question
 from llm.general_agpv_answerer import answer_general_agpv_question
 from llm.rag_source_router import decide_rag_source
@@ -137,6 +141,11 @@ def _render_descriptor_input(field, container=st, disabled=False):
     default = field.get("default")
 
     if allowed_values:
+        if field["id"] == "array.config":
+            allowed_values = [
+                value for value in allowed_values
+                if value not in UNAVAILABLE_ARRAY_CONFIGS
+            ]
         default_index = allowed_values.index(default) if default in allowed_values else 0
         return container.selectbox(
             label,
@@ -244,6 +253,11 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
 
     for group_name, group_fields in expert_field_groups.items():
         st.markdown(f"### {group_name.replace('_', ' ').title()}")
+        if group_name == "array":
+            st.caption(
+                "GSVBF is temporarily unavailable with the bundled PVMAPS "
+                "simulator; fixed and tracking configurations remain available."
+            )
 
         # Checkboxes render as compact inline controls while number/select
         # fields render as full bordered boxes below their label -- mixing
@@ -269,6 +283,10 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
         if not expert_location_context:
             st.error(EXPERT_MODE_TEXT["missing_location_error"])
         else:
+            expert_status = st.status(
+                PROCESSING_STATUS_TEXT["validation"],
+                expanded=False,
+            )
             expert_form_values["lat"] = expert_location_context["latitude"]
             expert_form_values["lon"] = expert_location_context["longitude"]
             expert_pvmaps_input = build_pvmaps_input_from_descriptor_values(
@@ -278,13 +296,22 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
 
             expert_errors = validate_pvmaps_descriptor_input(expert_pvmaps_input)
             if expert_errors:
+                expert_status.update(
+                    label=PROCESSING_STATUS_TEXT["failed"],
+                    state="error",
+                )
                 st.error(EXPERT_MODE_TEXT["validation_error_header"])
                 for expert_error in expert_errors:
                     st.write(f"- {expert_error}")
             else:
                 try:
                     expert_output, expert_explanation = run_expert_pvmaps_estimate(
-                        st.session_state, expert_pvmaps_input, api_key
+                        st.session_state,
+                        expert_pvmaps_input,
+                        api_key,
+                        status_callback=lambda message: expert_status.update(
+                            label=message
+                        ),
                     )
                     st.session_state["expert_last_run"] = {
                         "location_context": copy.deepcopy(expert_location_context),
@@ -296,7 +323,15 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                     # A new run means any previous follow-up chat no longer
                     # applies to what's on screen -- start fresh.
                     st.session_state["expert_chat_messages"] = []
+                    expert_status.update(
+                        label=PROCESSING_STATUS_TEXT["complete"],
+                        state="complete",
+                    )
                 except Exception as error:
+                    expert_status.update(
+                        label=PROCESSING_STATUS_TEXT["failed"],
+                        state="error",
+                    )
                     st.error(EXPERT_MODE_TEXT["simulation_error"])
                     add_llm_trace(
                         st.session_state,
@@ -338,21 +373,37 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
             with st.chat_message(MESSAGE_ROLE_USER):
                 st.write(expert_followup_question)
 
-            with st.spinner(CHAT_UI_TEXT["thinking_message"]):
+            with st.status(
+                PROCESSING_STATUS_TEXT["retrieval"],
+                expanded=False,
+            ) as expert_followup_status:
+                expert_turn_started_at = time.perf_counter()
+                expert_retrieval_error = None
                 try:
                     expert_followup_context = retrieve_for_source("both", expert_followup_question)
-                except Exception:
+                except Exception as error:
                     expert_followup_context = []
+                    expert_retrieval_error = str(error)
 
-                expert_followup_answer = answer_expert_followup_question(
-                    expert_followup_question,
-                    api_key,
-                    expert_last_run["input"],
-                    expert_last_run["output"],
-                    expert_last_run["explanation"],
-                    conversation_history=st.session_state["expert_chat_messages"],
-                    retrieved_context=expert_followup_context,
+                expert_followup_status.update(
+                    label=PROCESSING_STATUS_TEXT["answer"]
                 )
+                try:
+                    expert_followup_answer = answer_expert_followup_question(
+                        expert_followup_question,
+                        api_key,
+                        expert_last_run["input"],
+                        expert_last_run["output"],
+                        expert_last_run["explanation"],
+                        conversation_history=st.session_state["expert_chat_messages"],
+                        retrieved_context=expert_followup_context,
+                    )
+                except Exception:
+                    expert_followup_status.update(
+                        label=PROCESSING_STATUS_TEXT["failed"],
+                        state="error",
+                    )
+                    raise
                 st.session_state["expert_chat_messages"].append({
                     "role": MESSAGE_ROLE_ASSISTANT,
                     "content": expert_followup_answer,
@@ -372,6 +423,22 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                     st.session_state["session_id"], "expert_followup", "expert_followup",
                     expert_followup_question, expert_followup_answer,
                     retrieved_chunks=expert_followup_context,
+                    extra={
+                        "model_name": DEFAULT_MODEL,
+                        "user_profile": None,
+                        "location_context": expert_last_run.get("location_context"),
+                        "rag_enabled": True,
+                        "rag_source": "both",
+                        "retrieval_query": expert_followup_question,
+                        "response_time_ms": round(
+                            (time.perf_counter() - expert_turn_started_at) * 1000
+                        ),
+                        "error": expert_retrieval_error,
+                    },
+                )
+                expert_followup_status.update(
+                    label=PROCESSING_STATUS_TEXT["complete"],
+                    state="complete",
                 )
             st.rerun()
 
@@ -497,17 +564,31 @@ if submitted_question:
 
 question = st.session_state.get(PENDING_CHAT_QUESTION_KEY)
 if question:
+    turn_started_at = time.perf_counter()
 
-    with st.spinner(CHAT_UI_TEXT["thinking_message"]):
+    with st.status(
+        PROCESSING_STATUS_TEXT["routing"],
+        expanded=False,
+    ) as processing_status:
+        processing_failed = False
+
+        def update_processing_status(message):
+            processing_status.update(label=message)
+
         try:
             plan = route_conversation_turn(
                 api_key,
+                latest_user_message=question,
                 user_profile=st.session_state.get(SESSION_KEY_USER_PROFILE),
                 location_context=location_context,
                 conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
                 pvmaps_runs=st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
             )
         except Exception as error:
+            processing_status.update(
+                label=PROCESSING_STATUS_TEXT["failed"],
+                state="error",
+            )
             error_message = _chat_api_error_message(error)
             st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
                 "role": MESSAGE_ROLE_ASSISTANT,
@@ -536,6 +617,7 @@ if question:
         )
 
         if plan.get("mentioned_location"):
+            update_processing_status(PROCESSING_STATUS_TEXT["location"])
             try:
                 coordinates = geocode_location(plan["mentioned_location"])
                 location_context = {
@@ -553,6 +635,10 @@ if question:
                     decision="location_updated",
                 )
             except Exception as error:
+                processing_status.update(
+                    label=PROCESSING_STATUS_TEXT["failed"],
+                    state="error",
+                )
                 st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
                     "role": MESSAGE_ROLE_ASSISTANT,
                     "content": f"I couldn't confirm that location ('{plan['mentioned_location']}'). Could you try a simpler city/state or check the spelling?",
@@ -568,6 +654,7 @@ if question:
                 st.rerun()
 
         if plan["turn_type"] == TURN_TYPE_GATHER_INFO and plan.get("question"):
+            update_processing_status(PROCESSING_STATUS_TEXT["answer"])
             st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
                 "role": MESSAGE_ROLE_ASSISTANT,
                 "content": plan["question"],
@@ -575,21 +662,40 @@ if question:
             log_conversation_turn(
                 st.session_state["session_id"], "guided", TURN_TYPE_GATHER_INFO,
                 question, plan["question"],
+                extra={
+                    "model_name": DEFAULT_MODEL,
+                    "user_profile": st.session_state.get(SESSION_KEY_USER_PROFILE),
+                    "location_context": location_context,
+                    "response_time_ms": round(
+                        (time.perf_counter() - turn_started_at) * 1000
+                    ),
+                },
             )
 
         elif plan["turn_type"] == TURN_TYPE_RUN_PVMAPS:
             try:
-                run_recommended_pvmaps_estimate(
+                estimate_completed = run_recommended_pvmaps_estimate(
                     st.session_state,
                     api_key,
                     location_context,
                     latest_user_message=question,
+                    status_callback=update_processing_status,
                 )
+                processing_failed = not estimate_completed
                 log_conversation_turn(
                     st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
                     question, "PVMAPS estimate generated",
+                    extra={
+                        "model_name": DEFAULT_MODEL,
+                        "user_profile": st.session_state.get(SESSION_KEY_USER_PROFILE),
+                        "location_context": location_context,
+                        "response_time_ms": round(
+                            (time.perf_counter() - turn_started_at) * 1000
+                        ),
+                    },
                 )
             except Exception as error:
+                processing_failed = True
                 st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
                     "role": MESSAGE_ROLE_ASSISTANT,
                     "content": "I tried to run a solar-yield estimate, but PVMAPS could not complete the simulation. We can keep discussing the setup and assumptions.",
@@ -604,6 +710,15 @@ if question:
                 log_conversation_turn(
                     st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
                     question, "PVMAPS simulation failed",
+                    extra={
+                        "model_name": DEFAULT_MODEL,
+                        "user_profile": st.session_state.get(SESSION_KEY_USER_PROFILE),
+                        "location_context": location_context,
+                        "response_time_ms": round(
+                            (time.perf_counter() - turn_started_at) * 1000
+                        ),
+                        "error": str(error),
+                    },
                 )
 
         else:
@@ -611,7 +726,10 @@ if question:
             latest_pvmaps_output = pvmaps_runs[-1]["output"] if pvmaps_runs else None
 
             retrieved_context = []
+            rag_plan = {"source": "none", "reason": None}
+            retrieval_error = None
             try:
+                update_processing_status(PROCESSING_STATUS_TEXT["rag_routing"])
                 rag_plan = decide_rag_source(
                     question,
                     api_key,
@@ -624,6 +742,8 @@ if question:
                     output=rag_plan,
                     decision=rag_plan["source"],
                 )
+                if rag_plan["source"] != "none":
+                    update_processing_status(PROCESSING_STATUS_TEXT["retrieval"])
                 retrieved_context = retrieve_for_source(rag_plan["source"], question)
                 add_llm_trace(
                     st.session_state,
@@ -643,8 +763,11 @@ if question:
                     output={"error": str(error)},
                     decision="rag_skipped_due_to_error",
                 )
+                retrieval_error = str(error)
 
+            answer_error = None
             try:
+                update_processing_status(PROCESSING_STATUS_TEXT["answer"])
                 answer = answer_general_agpv_question(
                     question,
                     api_key,
@@ -657,6 +780,7 @@ if question:
                     retrieved_context=retrieved_context,
                 )
             except Exception as error:
+                processing_failed = True
                 answer = _chat_api_error_message(error)
                 add_llm_trace(
                     st.session_state,
@@ -665,6 +789,7 @@ if question:
                     output={"error": str(error)},
                     decision="answer_request_failed",
                 )
+                answer_error = str(error)
             add_llm_trace(
                 st.session_state,
                 "general_agpv_answerer",
@@ -689,7 +814,31 @@ if question:
             log_conversation_turn(
                 st.session_state["session_id"], "guided", "general_question",
                 question, answer, retrieved_chunks=retrieved_context,
+                extra={
+                    "model_name": DEFAULT_MODEL,
+                    "user_profile": st.session_state.get(SESSION_KEY_USER_PROFILE),
+                    "location_context": location_context,
+                    "rag_enabled": rag_plan.get("source", "none") != "none",
+                    "rag_source": rag_plan.get("source", "none"),
+                    "rag_router_reason": rag_plan.get("reason"),
+                    "retrieval_query": (
+                        question if rag_plan.get("source", "none") != "none" else None
+                    ),
+                    "response_time_ms": round(
+                        (time.perf_counter() - turn_started_at) * 1000
+                    ),
+                    "error": answer_error or retrieval_error,
+                },
             )
+
+        processing_status.update(
+            label=(
+                PROCESSING_STATUS_TEXT["failed"]
+                if processing_failed
+                else PROCESSING_STATUS_TEXT["complete"]
+            ),
+            state="error" if processing_failed else "complete",
+        )
 
     st.session_state.pop(PENDING_CHAT_QUESTION_KEY, None)
     st.rerun()

@@ -5,6 +5,10 @@ from numbers import Real
 
 from constants import MONTH_LABELS
 from models.pvmaps.descriptor import get_pvmaps_input_descriptors
+from ui.array_visualization import (
+    configuration_caption,
+    create_array_configuration_figure,
+)
 
 
 PARAMETER_KEYS = {
@@ -96,6 +100,22 @@ def render_simulation_result(run):
     st.metric("Simulated annual yield", f"{format_value(output.get('yearly_yield'))} {unit}")
     if unit == "kWh/m":
         st.caption("Annual electricity generated per meter of solar-panel row, not per square meter or for the whole farm.")
+
+    inputs = run.get("input") or {}
+    array = inputs.get("array") or {}
+    if array.get("config") in ("fixed", "tracking", "GSVBF"):
+        with st.expander("Array layout", expanded=False):
+            layout_figure = create_array_configuration_figure(inputs)
+            try:
+                st.pyplot(layout_figure, use_container_width=True)
+            finally:
+                plt.close(layout_figure)
+            st.caption(configuration_caption(array))
+            st.caption(
+                "Conceptual view only. Labels report submitted PVMAPS inputs; "
+                "drawing proportions are not to scale. The reflectivity gauge "
+                "shows the submitted albedo input, not simulated irradiance."
+            )
 
     monthly = output.get("monthly_yield")
     if isinstance(monthly, list) and len(monthly) == 12 and all(

@@ -6,6 +6,8 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
+from constants import UNAVAILABLE_ARRAY_CONFIGS
+
 
 PVMAPS_DESCRIPTOR_PATH = Path(__file__).with_name("pvmaps.json")
 
@@ -148,5 +150,9 @@ def validate_pvmaps_descriptor_input(pvmaps_input: dict) -> list[str]:
                 errors.append(rule["message"])
         else:
             raise ValueError(f"Unsupported PVMAPS validation rule: {rule['type']}")
+
+    array_config = (pvmaps_input.get("array") or {}).get("config")
+    if array_config in UNAVAILABLE_ARRAY_CONFIGS:
+        errors.append(UNAVAILABLE_ARRAY_CONFIGS[array_config])
 
     return errors

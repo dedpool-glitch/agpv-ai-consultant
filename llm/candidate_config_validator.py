@@ -1,4 +1,5 @@
 from questionnaire.parser import parse_questionnaire_answer
+from constants import UNAVAILABLE_ARRAY_CONFIGS
 
 
 def validate_candidate_config(candidate):
@@ -45,5 +46,11 @@ def validate_candidate_config(candidate):
 
     if errors:
         return None, errors
+
+    if parsed_inputs["array_config"] in UNAVAILABLE_ARRAY_CONFIGS:
+        return None, [UNAVAILABLE_ARRAY_CONFIGS[parsed_inputs["array_config"]]]
+
+    if parsed_inputs["array_config"] == "GSVBF" and parsed_inputs["gs_height"] <= 0:
+        return None, ["gs_height: Ground sculpting height must be greater than zero for GSVBF arrays."]
 
     return parsed_inputs, []

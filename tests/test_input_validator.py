@@ -42,6 +42,26 @@ def test_invalid_array_config_is_rejected():
     assert PVMAPS_VALIDATION_MESSAGES["invalid_array_config"] in errors
 
 
+def test_gsvbf_requires_positive_ground_sculpting_height():
+    data = make_valid_pvmaps_input()
+    data["array"]["config"] = "GSVBF"
+    data["array"]["gsHeight"] = 0
+
+    errors = validate_pvmaps_input(data)
+
+    assert PVMAPS_VALIDATION_MESSAGES["gsvbf_gs_height_positive"] in errors
+
+
+def test_gsvbf_is_rejected_while_bundled_simulator_is_incompatible():
+    data = make_valid_pvmaps_input()
+    data["array"]["config"] = "GSVBF"
+    data["array"]["gsHeight"] = 0.5
+
+    errors = validate_pvmaps_input(data)
+
+    assert PVMAPS_VALIDATION_MESSAGES["unavailable_array_config"] in errors
+
+
 def test_invalid_pitch_is_rejected():
     data = make_valid_pvmaps_input()
     data["array"]["pitch"] = 0

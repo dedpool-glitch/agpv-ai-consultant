@@ -1,11 +1,16 @@
 from models.pvmaps.matlab_runner import run_pvmaps
-from constants import PVMAPS_SCRIPT_PATH
+from constants import PROCESSING_STATUS_TEXT, PVMAPS_SCRIPT_PATH
 from llm.output_generator import explain_output
 from services.explainer_context import log_expert_explanation_result
 from services.llm_trace import add_llm_trace
 
 
-def run_expert_pvmaps_estimate(session_state, pvmaps_input, api_key):
+def run_expert_pvmaps_estimate(
+    session_state,
+    pvmaps_input,
+    api_key,
+    status_callback=None,
+):
     """
     Run PVMAPS on an expert-supplied, already-validated input and explain the
     result -- no Recommender, no baseline/diff logic, since the parameters
@@ -18,6 +23,8 @@ def run_expert_pvmaps_estimate(session_state, pvmaps_input, api_key):
     yield metrics) so results can be reviewed across many real runs, not
     just a handful of hardcoded test cases.
     """
+    if status_callback:
+        status_callback(PROCESSING_STATUS_TEXT["simulation"])
     output = run_pvmaps(pvmaps_input, PVMAPS_SCRIPT_PATH)
 
     input_provenance = {
@@ -28,6 +35,8 @@ def run_expert_pvmaps_estimate(session_state, pvmaps_input, api_key):
             "Site coordinates were resolved by the geocoder."
         ),
     }
+    if status_callback:
+        status_callback(PROCESSING_STATUS_TEXT["explanation"])
     explanation = explain_output(
         output,
         api_key,
