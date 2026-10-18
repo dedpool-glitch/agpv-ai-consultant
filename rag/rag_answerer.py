@@ -11,6 +11,10 @@ def format_retrieved_context(retrieved_chunks):
         title = metadata.get("title", "Unknown source")
         page = metadata.get("page", "unknown page")
         headings = metadata.get("headings", "")
+        record_type = metadata.get("record_type", "context")
+        parent_context = chunk.get("parent_context")
+        parent_text = parent_context.get("text", "") if parent_context else ""
+        parent_block = f"Linked explanatory context:\n{parent_text}" if parent_text else ""
 
         context_blocks.append(
             f"""
@@ -18,8 +22,10 @@ Source {index}
 Title: {title}
 Page: {page}
 Headings: {headings}
+Record type: {record_type}
 Text:
 {chunk["text"]}
+{parent_block}
 """
         )
 

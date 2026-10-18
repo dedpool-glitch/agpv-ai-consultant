@@ -1,0 +1,4 @@
+case_id,question,expected_terms,expected_title_contains,expected_page
+paper_001,"What equation does the paper use to define bifacial gain in energy, and what do its terms mean?",BG_E|Y_BF|Y_Mono_opt|100,Critical Analysis of Bifacial Solar Farm Configurations,8
+paper_002,"How does the paper decompose total diffuse irradiance into sky and albedo components?",I_diff|I_sky|I_albedo|R_A|I_ground,Critical Analysis of Bifacial Solar Farm Configurations,13
+paper_003,"What matrix equation does the paper use to solve for sky diffuse irradiance and ground irradiance?",I|C^{-1}|I_diff,Critical Analysis of Bifacial Solar Farm Configurations,13

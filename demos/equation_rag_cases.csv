@@ -1,0 +1,6 @@
+case_id,question,expected_terms,expected_title_contains,expected_page
+equation_001,What equation does the source use to define bifacial gain?,,,
+equation_002,What mathematical relationship is used for row-spacing or pitch optimization?,,,
+equation_003,Show the equation used to calculate photovoltaic energy yield and explain each variable.,,,
+equation_004,What formula relates irradiance to the module's electrical output?,,,
+equation_005,Is there an equation describing shading or ground-reflected irradiance?,,,

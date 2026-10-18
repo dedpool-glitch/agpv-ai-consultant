@@ -1,0 +1,9 @@
+case_id,question,expected_terms,expected_title_contains,expected_page
+book_001,"What equation relates global horizontal irradiance to direct normal irradiance, zenith angle, and diffuse horizontal irradiance?",I_GHI|I_DNI|I_DHI|cos,alam book,31
+book_002,"What formula defines air mass using the solar zenith angle?",AM|cos|theta_Z,alam book,30
+book_003,"What equation estimates diffuse horizontal irradiance from atmospheric transmittance and air mass?",I_DHI|beta|tau|AM|I_0,alam book,33
+book_004,"What equation gives the extraterrestrial solar intensity at a distance d from the sun?",I_0|sigma|T_S|r_s|d,alam book,24
+book_005,"What equation gives the open-circuit voltage of the two-level solar-energy conversion system and shows the Carnot factor?",V_oc|mu_1|mu_2|T_D|T_S,alam book,52
+book_006,"What equation describes solar declination as a function of the day number n?",delta|23.45|sin|n,solar cells pages 0-40,27
+book_007,"What approximate equation describes the Earth-Sun distance over the year as a function of day number?",sun distance|1.5|0.017|sin|n,solar cells pages 0-40,27
+book_008,"What equation estimates direct solar intensity for an arbitrary atmospheric air mass?",1.353|0.7|air mass|kW,solar cells pages 0-40,29
