@@ -5,12 +5,9 @@ matplotlib==3.10.9
 # Location lookup
 geopy==2.4.1
 # MATLAB Engine for Python -- each matlabengine release supports exactly one
-# MATLAB release. This version matches R2025b. If your installed MATLAB is a
-# different release, `pip install` this exact pin will fail or mismatch --
-# instead run `pip install matlabengine` (unpinned) to get the version that
-# matches whatever MATLAB you actually have, or check the "Required MathWorks
-# Products" on each matlabengine release's PyPI page.
-matlabengine==25.2.2
+# MATLAB release. This version matches the MATLAB R2026a release required by
+# the demo distribution and user guide.
+matlabengine==26.1.12
 # Loads .env files (e.g. PURDUE_GENAI_KEY) if present
 python-dotenv==1.2.2
 # Vector DB for the RAG pipeline (papers/books retrieval)

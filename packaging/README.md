@@ -7,11 +7,12 @@ never patched. This builds a console executable plus a supporting folder.
 
 Use the Python environment that already runs the application successfully.
 Its MATLAB Engine must match the installed MATLAB. The repository requirements
-currently target R2025b; the inspected development environment uses R2026a.
-Do not blindly reinstall the older Engine over that working environment.
+target MATLAB R2026a with MATLAB Engine 26.1.12, matching the demo guide and
+the validated protected-package configuration.
 
 ```powershell
-& 'C:\Users\Jabir\miniforge3\python.exe' -m venv --system-site-packages packaging/.venv
+& .\.venv\Scripts\python.exe -m venv packaging/.venv
+& .\packaging\.venv\Scripts\python.exe -m pip install -r requirements.txt
 & .\packaging\.venv\Scripts\python.exe -m pip install -r packaging/requirements-build.txt
 & .\packaging\.venv\Scripts\python.exe -m pip install --ignore-installed --no-deps grpcio==1.82.1
 & .\packaging\build.ps1 -Python .\packaging\.venv\Scripts\python.exe
@@ -25,9 +26,9 @@ The printed executable path identifies the completed build. Ship its whole
 `AgPV-Assistant` folder, not just the executable. Do not ship `build/`, which
 contains unprotected analysis sources even when building with obfuscation.
 
-Build tools live in the isolated virtual environment; application dependencies
-are inherited from the working environment. Versions are recorded in the output.
-For repeatable releases, recreate a clean environment with those versions.
+Application and build dependencies are installed into the isolated packaging
+environment from the pinned requirement files. Versions are recorded in the
+output. For repeatable releases, recreate a clean environment with those pins.
 
 ## How it works
 
