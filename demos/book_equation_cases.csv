@@ -1,9 +1,15 @@
-case_id,question,expected_terms,expected_title_contains,expected_page
-book_001,"What equation relates global horizontal irradiance to direct normal irradiance, zenith angle, and diffuse horizontal irradiance?",I_GHI|I_DNI|I_DHI|cos,alam book,31
-book_002,"What formula defines air mass using the solar zenith angle?",AM|cos|theta_Z,alam book,30
-book_003,"What equation estimates diffuse horizontal irradiance from atmospheric transmittance and air mass?",I_DHI|beta|tau|AM|I_0,alam book,33
-book_004,"What equation gives the extraterrestrial solar intensity at a distance d from the sun?",I_0|sigma|T_S|r_s|d,alam book,24
-book_005,"What equation gives the open-circuit voltage of the two-level solar-energy conversion system and shows the Carnot factor?",V_oc|mu_1|mu_2|T_D|T_S,alam book,52
-book_006,"What equation describes solar declination as a function of the day number n?",delta|23.45|sin|n,solar cells pages 0-40,27
-book_007,"What approximate equation describes the Earth-Sun distance over the year as a function of day number?",sun distance|1.5|0.017|sin|n,solar cells pages 0-40,27
-book_008,"What equation estimates direct solar intensity for an arbitrary atmospheric air mass?",1.353|0.7|air mass|kW,solar cells pages 0-40,29
+﻿case_id,question,expected_terms,expected_title_contains,expected_page,concept,expected_record_id
+book_001,"What equation relates global horizontal irradiance to direct normal irradiance, zenith angle, and diffuse horizontal irradiance?",I_GHI|I_DNI|I_DHI|cos,alam book,31,irradiance,alam_book_page_31_equation_0
+book_002,What formula defines air mass using the solar zenith angle?,AM|cos|theta_Z,alam book,30,air mass,alam_book_page_30_equation_0
+book_003,What equation estimates diffuse horizontal irradiance from atmospheric transmittance and air mass?,I_DHI|beta|tau|AM|I_0,alam book,33,diffuse irradiance,alam_book_page_33_equation_1
+book_004,What equation gives the extraterrestrial solar intensity at a distance d from the sun?,I_0|sigma|T_S|r_s|d,alam book,24,solar intensity,alam_book_page_24_equation_1
+book_005,What equation gives the open-circuit voltage of the two-level solar-energy conversion system and shows the Carnot factor?,V_oc|mu_1|mu_2|T_D|T_S,alam book,52,conversion thermodynamics,alam_book_page_52_equation_5
+book_006,What equation describes solar declination as a function of the day number n?,delta|23.45|sin|n,solar cells pages 0-40,27,declination,solar_cells_pages_0_40_page_27_equation_0
+book_007,What approximate equation describes the Earth-Sun distance over the year as a function of day number?,sun distance|1.5|0.017|sin,solar cells pages 0-40,27,orbital geometry,solar_cells_pages_0_40_page_27_equation_1
+book_008,What equation estimates direct solar intensity for an arbitrary atmospheric air mass?,1.353|0.7|air mass|k W,solar cells pages 0-40,29,atmospheric attenuation,solar_cells_pages_0_40_page_29_equation_0
+book_009,What equation accounts for finite atmospheric thickness and planet curvature when calculating air mass near the horizon?,AM|sqrt|r_p|theta_Z,alam book,32,spherical air mass,alam_book_page_32_equation_0
+book_010,What approximate equation relates maximum-power and short-circuit current to solar concentration and bandgap under AM1.5G illumination?,I_{mp}|I_{sc}|E_g|simeq,alam book,91,PV electrical behavior,alam_book_page_91_equation_0
+book_011,What equation relates open-circuit voltage to ambient temperature and concentration-induced cell heating?,V_{oc}|T_A|zeta|J_{ph}|J_{00},alam book,127,temperature and voltage,alam_book_page_127_equation_0
+book_012,"What equation calculates levelized cost of energy including discounted maintenance, residual value, and annual degradation?",LCOE|C_{sys}|C_{om}|C_{rv}|P_0,alam book,338,lifetime LCOE,alam_book_page_338_equation_1
+book_013,What equation expresses technology-agnostic essential LCOE in terms of module-to-land cost and pitch-to-height ratios?,LCOE|M_L|p/h|chi,alam book,346,farm optimization,alam_book_page_346_equation_2
+book_014,What equation estimates fill-factor degradation caused by both series and shunt resistance relative to load resistance?,FF(0)|R_s|R_L|R_{sh},alam book,451,resistive losses,alam_book_page_451_equation_1
