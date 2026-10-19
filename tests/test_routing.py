@@ -112,3 +112,61 @@ def test_no_rag_decision_remains_none(monkeypatch):
     decision = decide_rag_source("Hello", api_key="key")
 
     assert decision["source"] == "none"
+
+
+def test_router_prompt_requires_research_grounding_for_contextual_followups(monkeypatch):
+    captured = {}
+
+    def fake_call(messages, _api_key):
+        captured["system"] = messages[0]["content"]
+        captured["user"] = messages[-1]["content"]
+        return json.dumps({
+            "source": "both",
+            "reason": "Ground the research equation follow-up.",
+            "query_mode": "contextual",
+            "retrieval_query": (
+                "What does the denominator of the bifacial energy gain equation mean?"
+            ),
+        })
+
+    monkeypatch.setattr("llm.rag_source_router.call_llm", fake_call)
+    history = [
+        {"role": "user", "content": "What equation defines bifacial energy gain?"},
+        {"role": "assistant", "content": "It compares bifacial and monofacial yield."},
+        {"role": "user", "content": "What does its denominator mean?"},
+    ]
+
+    decision = decide_rag_source(
+        "What does its denominator mean?", "key", conversation_history=history
+    )
+
+    assert "Do not choose \"none\" merely because an earlier assistant answer" in captured["system"]
+    assert "What does its denominator mean?" in captured["user"]
+    assert decision["source"] == "both"
+    assert decision["query_mode"] == "contextual"
+
+
+def test_router_prompt_preserves_existing_run_exception(monkeypatch):
+    captured = {}
+
+    def fake_call(messages, _api_key):
+        captured["system"] = messages[0]["content"]
+        return json.dumps({
+            "source": "none",
+            "reason": "Use the existing run data.",
+            "query_mode": "contextual",
+            "retrieval_query": "Why was 12 m pitch used for my existing PVMAPS run?",
+        })
+
+    monkeypatch.setattr("llm.rag_source_router.call_llm", fake_call)
+    decision = decide_rag_source(
+        "Why did you use that pitch?",
+        "key",
+        conversation_history=[
+            {"role": "assistant", "content": "Your completed run used a 12 m pitch."},
+            {"role": "user", "content": "Why did you use that pitch?"},
+        ],
+    )
+
+    assert "Always choose \"none\" for a question about an existing PVMAPS run" in captured["system"]
+    assert decision["source"] == "none"

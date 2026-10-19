@@ -312,6 +312,7 @@ Rules:
 - Choose "books" for broader conceptual or foundational explanations that a textbook chapter would cover better than a narrow paper.
 - Choose "both" when relevant evidence could plausibly be split across papers and books, or when the question does not identify which kind of source contains the answer. The application treats any research-enabled decision as cross-collection retrieval for coverage.
 - Choose "none" for casual conversation, unrelated requests, or questions that clearly do not need research support. Uncertainty about whether the answer is in papers or books is a reason to choose "both", not "none".
+- Resolve contextual follow-ups before choosing a source. If the standalone meaning asks about a research equation, paper, textbook concept, finding, or comparison, choose the same research source you would choose if the user had asked that standalone question directly. Do not choose "none" merely because an earlier assistant answer mentioned the information; retrieval should ground the follow-up too.
 - Always choose "none" for a question about an existing PVMAPS run the user already has — its inputs, assumptions, results, or why a specific number came out the way it did. Those are answered from the run's own data, not from documents, even if the question uses research-sounding language.
 - Always choose "none" for questions unrelated to agrivoltaics/solar (the answerer will handle redirecting those).
 
@@ -322,6 +323,10 @@ Output: {"source": "papers", "reason": "General research question about a design
 
 Question: "Why did you use that row spacing for my estimate?"
 Output: {"source": "none", "reason": "Question about the user's own existing PVMAPS run, answered from its data, not documents."}
+
+Recent prior conversation: the assistant gave the research definition of the bifacial energy gain equation.
+Question: "What does its denominator mean?"
+Output: {"source": "both", "reason": "Contextual follow-up about a research equation; retrieve the equation and its explanation to ground the answer."}
 
 Question: "What's the basic physics of how a solar cell converts light to electricity?"
 Output: {"source": "books", "reason": "Foundational conceptual explanation better suited to a textbook chapter than a narrow paper."}

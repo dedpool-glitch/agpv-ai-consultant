@@ -50,7 +50,7 @@ from llm.consultation_planner import route_conversation_turn
 from llm.client import DEFAULT_MODEL
 from llm.expert_followup_answerer import answer_expert_followup_question
 from llm.general_agpv_answerer import answer_general_agpv_question
-from llm.rag_source_router import decide_rag_source
+from llm.rag_source_router import decide_rag_source, plan_expert_retrieval
 from models.pvmaps.descriptor import (
     build_pvmaps_input_from_descriptor_values,
     get_pvmaps_input_descriptors,
@@ -380,10 +380,17 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                 expert_turn_started_at = time.perf_counter()
                 expert_retrieval_error = None
                 try:
-                    expert_followup_context = retrieve_for_source("both", expert_followup_question)
+                    expert_query_plan = plan_expert_retrieval(
+                        expert_followup_question, api_key,
+                        st.session_state["expert_chat_messages"],
+                    )
+                    expert_followup_context = retrieve_for_source(
+                        "both", expert_query_plan["retrieval_query"]
+                    )
                 except Exception as error:
                     expert_followup_context = []
                     expert_retrieval_error = str(error)
+                    expert_query_plan = {"retrieval_query": expert_followup_question, "query_mode": "fallback"}
 
                 expert_followup_status.update(
                     label=PROCESSING_STATUS_TEXT["answer"]
@@ -414,6 +421,7 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                     "expert_mode_followup_chat",
                     input_summary={
                         "question": expert_followup_question,
+                        "query_plan": expert_query_plan,
                         "retrieved_count": len(expert_followup_context),
                     },
                     output={"answer": expert_followup_answer},
@@ -429,7 +437,8 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                         "location_context": expert_last_run.get("location_context"),
                         "rag_enabled": True,
                         "rag_source": "both",
-                        "retrieval_query": expert_followup_question,
+                        "retrieval_query": expert_query_plan["retrieval_query"],
+                        "retrieval_query_mode": expert_query_plan["query_mode"],
                         "response_time_ms": round(
                             (time.perf_counter() - expert_turn_started_at) * 1000
                         ),
@@ -744,11 +753,17 @@ if question:
                 )
                 if rag_plan["source"] != "none":
                     update_processing_status(PROCESSING_STATUS_TEXT["retrieval"])
-                retrieved_context = retrieve_for_source(rag_plan["source"], question)
+                retrieved_context = retrieve_for_source(
+                    rag_plan["source"], rag_plan.get("retrieval_query", question)
+                )
                 add_llm_trace(
                     st.session_state,
                     "rag_retrieval",
-                    input_summary={"question": question, "source": rag_plan["source"]},
+                    input_summary={
+                        "question": question, "source": rag_plan["source"],
+                        "retrieval_query": rag_plan.get("retrieval_query", question),
+                        "query_mode": rag_plan.get("query_mode"),
+                    },
                     output={
                         "retrieved_count": len(retrieved_context),
                         "chunks": summarize_retrieved_chunks(retrieved_context),
@@ -822,8 +837,10 @@ if question:
                     "rag_source": rag_plan.get("source", "none"),
                     "rag_router_reason": rag_plan.get("reason"),
                     "retrieval_query": (
-                        question if rag_plan.get("source", "none") != "none" else None
+                        rag_plan.get("retrieval_query", question)
+                        if rag_plan.get("source", "none") != "none" else None
                     ),
+                    "retrieval_query_mode": rag_plan.get("query_mode"),
                     "response_time_ms": round(
                         (time.perf_counter() - turn_started_at) * 1000
                     ),
