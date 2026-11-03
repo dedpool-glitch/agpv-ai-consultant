@@ -64,6 +64,7 @@ from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 from ui.simulation_result import render_simulation_result
 from ui.simulation_comparison import render_simulation_comparison
 from ui.simulation_export import render_simulation_exports
+from ui.conversation_export import render_conversation_export
 
 load_dotenv()
 st.set_page_config(layout="wide")
@@ -361,6 +362,22 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
             with st.chat_message(expert_chat_message["role"]):
                 st.write(expert_chat_message["content"])
 
+        expert_export_messages = [
+            {
+                "role": MESSAGE_ROLE_ASSISTANT,
+                "type": MESSAGE_TYPE_PVMAPS_RUN,
+                "run_index": 0,
+            },
+            {
+                "role": MESSAGE_ROLE_ASSISTANT,
+                "content": expert_last_run["explanation"],
+            },
+            *st.session_state["expert_chat_messages"],
+        ]
+        render_conversation_export(
+            expert_export_messages, [expert_last_run], "expert"
+        )
+
         expert_followup_question = st.chat_input(
             "Ask a question about this result", key="expert_chat_input"
         )
@@ -561,6 +578,11 @@ for message in st.session_state[SESSION_KEY_CHAT_MESSAGES]:
 
 render_simulation_comparison(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []))
 render_simulation_exports(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []), "guided")
+render_conversation_export(
+    st.session_state[SESSION_KEY_CHAT_MESSAGES],
+    st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
+    "guided",
+)
 
 submitted_question = st.chat_input(CHAT_UI_TEXT["answer_label"], key="chat_input")
 if submitted_question:
