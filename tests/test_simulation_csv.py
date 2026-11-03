@@ -78,6 +78,27 @@ class SimulationCsvTests(unittest.TestCase):
         self.assertEqual(daily.max_row, 3)
         self.assertEqual(daily["C3"].value, 4.25)
 
+    def test_workbook_includes_crop_positions_when_present(self):
+        run = {
+            "output": {"yearly_yield": 650.6, "yield_unit": "kWh/m"},
+            "crop_result": {
+                "crop": "rice", "sowing_date": "2024-05-15",
+                "maturity_date": "2024-10-05", "mean_grain_yield_t_ha": 16.37,
+                "open_sky_grain_yield_t_ha": 20.0,
+                "difference_from_open_sky_t_ha": -3.63,
+                "difference_from_open_sky_percent": -18.15,
+                "grain_yield_t_ha_by_position": [10.0, 16.0, 23.11],
+            },
+        }
+        book = load_workbook(BytesIO(build_simulation_workbook([run])))
+        self.assertEqual(book.sheetnames, ["Runs", "Daily yield", "Crop yield"])
+        sheet = book["Crop yield"]
+        self.assertEqual(sheet.max_row, 4)
+        self.assertEqual(sheet["I2"].value, 0)
+        self.assertEqual(sheet["J4"].value, 23.11)
+        self.assertEqual(sheet["F2"].value, 20.0)
+        self.assertEqual(sheet["H2"].value, -18.15)
+
 
 if __name__ == "__main__":
     unittest.main()

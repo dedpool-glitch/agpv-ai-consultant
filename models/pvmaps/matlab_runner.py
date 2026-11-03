@@ -22,7 +22,14 @@ def _validate_matlab_dependencies(eng, cell_tech):
         )
 
 
-def run_pvmaps(pvmaps_input, script_path):
+def run_pvmaps(pvmaps_input, script_path, include_ground_light=False, light_year=None):
+    if include_ground_light and (
+        not isinstance(light_year, int) or isinstance(light_year, bool) or light_year < 1
+    ):
+        raise ValueError("A calendar year is required for daily ground light.")
+    if include_ground_light:
+        from models.simple.pv_batch import run_crop_pv_batch
+        return run_crop_pv_batch(pvmaps_input, script_path, light_year)
     script_path = Path(script_path).resolve()
     
     # Check for the proper path 
@@ -39,8 +46,6 @@ def run_pvmaps(pvmaps_input, script_path):
         eng.addpath(os.path.join(pvmaps_path, "data"), nargout=0)
         eng.addpath(os.path.join(pvmaps_path, "lib", "textprogressbar"), nargout=0)
         eng.addpath(os.path.join(pvmaps_path, "lib", "PVLIB_Matlab-master", "PVLIB"), nargout=0)
-
-
         eng.eval("input=initiate();",nargout=0)
         _validate_matlab_dependencies(eng, pvmaps_input["module"]["cell_tech"])
         #input module fields(properties of a single solar panel)
@@ -74,9 +79,9 @@ def run_pvmaps(pvmaps_input, script_path):
         )
 
         #run the simulation
-        pvmaps_output = eng.simulate(eng.workspace["input"],nargout=1) #call function simulate with input.
+        pvmaps_output = eng.simulate(eng.workspace["input"], nargout=1)
         warnings = []
-        return {
+        result = {
             "yearly_yield": float(pvmaps_output["yearly_yield"]),
             "monthly_yield": list(pvmaps_output["monthly_yield"][0]),
             "daily_yield": list(pvmaps_output["daily_yield"][0]),
@@ -90,8 +95,9 @@ def run_pvmaps(pvmaps_input, script_path):
                 "tracking": pvmaps_input["array"]["config"],
                 "tilt": pvmaps_input["array"]["tilt"],
                 "pitch": pvmaps_input["array"]["pitch"],
+            },
         }
-        }
+        return result
     finally:
         # Without this, every simulation leaves its MATLAB process running in
         # the background indefinitely, these leaked processes pile up and eventually

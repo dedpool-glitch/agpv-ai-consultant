@@ -103,7 +103,7 @@ def render_simulation_result(run):
 
     inputs = run.get("input") or {}
     array = inputs.get("array") or {}
-    if array.get("config") in ("fixed", "tracking", "GSVBF"):
+    if not run.get("crop_result") and array.get("config") in ("fixed", "tracking", "GSVBF"):
         with st.expander("Array layout", expanded=False):
             layout_figure = create_array_configuration_figure(inputs)
             try:

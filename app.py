@@ -4,6 +4,7 @@ import json
 import os
 import time
 import uuid
+from datetime import date
 from dotenv import load_dotenv
 
 import traceback 
@@ -59,12 +60,14 @@ from models.pvmaps.descriptor import (
 from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
 from services.conversation_log import log_conversation_turn
 from services.expert_estimate_service import run_expert_pvmaps_estimate
+from services.combined_estimate_service import run_combined_estimate
 from services.llm_trace import add_llm_trace
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 from ui.simulation_result import render_simulation_result
 from ui.simulation_comparison import render_simulation_comparison
 from ui.simulation_export import render_simulation_exports
 from ui.conversation_export import render_conversation_export
+from ui.array_visualization import create_array_configuration_figure
 
 load_dotenv()
 st.set_page_config(layout="wide")
@@ -209,10 +212,33 @@ with st.sidebar:
     if st.button(EXPERT_MODE_TEXT["switch_mode_button"]):
         st.session_state[SESSION_KEY_APP_MODE] = None
         st.rerun()
-        
+
+
+def render_trace_details():
+    traces = st.session_state.get(SESSION_KEY_LLM_TRACE) or []
+    if not traces:
+        st.write(TRACE_UI_TEXT["empty_message"])
+        return
+    for index, trace in enumerate(traces, start=1):
+        st.markdown(f"**{index}. {trace['stage']}** `{trace['time']}`")
+        if trace.get("decision"):
+            st.write("Decision:", trace["decision"])
+        if trace.get("input") is not None:
+            st.write("Input")
+            st.json(trace["input"])
+        if trace.get("output") is not None:
+            st.write("Output")
+            st.json(trace["output"])
+        st.divider()
+
+
 # Expert mode interface 
 if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
     st.subheader(EXPERT_MODE_TEXT["form_header"])
+    expert_analysis = st.radio(
+        "Analysis", ["Solar yield", "Solar + crop yield"], horizontal=True,
+        key="expert_analysis",
+    )
 
     # Fields render in a grid, this many per row, grouped under each
     # section header -- uses the full page width instead of a narrow
@@ -223,7 +249,8 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
     # Lat/lon are part of the descriptor like any other input, but nobody
     # actually knows their site's decimal coordinates -- render these two
     # specially as a location lookup instead of raw number fields.
-    st.markdown("### Location")
+    st.markdown("### 1. Site location")
+    st.caption("Enter the farm or project site and confirm the resolved address before running.")
     expert_site_location = st.text_input(
         LOCATION_TEXT["input_label"], key="expert_site_location"
     )
@@ -241,8 +268,35 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
             st.error(LOCATION_TEXT["geocode_error"])
 
     expert_location_context = st.session_state.get("expert_location_context")
+    if (expert_location_context and
+            expert_location_context["site_location"] != expert_site_location):
+        expert_location_context = None
+        st.session_state["expert_location_context"] = None
+        st.warning("The location text changed. Confirm the new site to use its coordinates.")
     if expert_location_context:
         st.success(f"Using location: {expert_location_context['confirmed_address']}")
+
+    crop_name = None
+    sowing_date = None
+    if expert_analysis == "Solar + crop yield":
+        st.markdown("### 2. Crop and planting")
+        crop_name = st.selectbox(
+            "Crop type", ["maize", "rice", "sorghum", "soybean"],
+            format_func=str.title,
+        )
+        st.caption(
+            "These four crops have specification files in the supplied SIMPLE model. "
+            "Maize uses its calibrated specification."
+        )
+        sowing_date = st.date_input("Sowing date", value=date(2024, 5, 15))
+        st.info(
+            "Model assumptions: fixed soil settings and no water stress. "
+            "If maturity crosses December, the sowing year's weather and ground light repeat. "
+            "PV-MAPS supplies a representative light profile for each month."
+        )
+
+    st.markdown("### 3. PV configuration" if expert_analysis == "Solar + crop yield"
+                else "### 2. PV configuration")
 
     expert_form_values = {}
     expert_field_groups = {}
@@ -306,20 +360,36 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                     st.write(f"- {expert_error}")
             else:
                 try:
-                    expert_output, expert_explanation = run_expert_pvmaps_estimate(
-                        st.session_state,
-                        expert_pvmaps_input,
-                        api_key,
-                        status_callback=lambda message: expert_status.update(
-                            label=message
-                        ),
-                    )
+                    crop_result = None
+                    if expert_analysis == "Solar + crop yield":
+                        expert_status.update(label="Running PV and crop models")
+                        combined = run_combined_estimate(
+                            expert_pvmaps_input, crop_name, sowing_date,
+                        )
+                        expert_output = combined["pv"]
+                        crop_result = combined["crop"]
+                        expert_explanation = (
+                            f"SIMPLE estimates {crop_result['mean_grain_yield_t_ha']:.2f} t/ha "
+                            f"mean {crop_name} grain yield, with maturity on "
+                            f"{crop_result['maturity_date']}. The PV and crop estimates use "
+                            "the site and inputs shown above. Crop assumptions are listed below."
+                        )
+                    else:
+                        expert_output, expert_explanation = run_expert_pvmaps_estimate(
+                            st.session_state,
+                            expert_pvmaps_input,
+                            api_key,
+                            status_callback=lambda message: expert_status.update(
+                                label=message
+                            ),
+                        )
                     st.session_state["expert_last_run"] = {
                         "location_context": copy.deepcopy(expert_location_context),
                         "input_provenance": {"source": "expert_form"},
                         "input": expert_pvmaps_input,
                         "output": expert_output,
                         "explanation": expert_explanation,
+                        "crop_result": crop_result,
                     }
                     # A new run means any previous follow-up chat no longer
                     # applies to what's on screen -- start fresh.
@@ -348,10 +418,87 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
     # Visualize the PVMAPS' output -- below the form, full width.
     if expert_last_run:
         render_simulation_result(expert_last_run)
-
-        st.subheader(EXPERT_MODE_TEXT["explanation_header"])
-        st.write(expert_last_run["explanation"])
-        render_simulation_exports([expert_last_run], "expert")
+        if expert_last_run.get("crop_result"):
+            crop_result = expert_last_run["crop_result"]
+            st.subheader("Crop yield")
+            st.metric("Mean grain yield with PV", f"{crop_result['mean_grain_yield_t_ha']:.2f} t/ha")
+            st.write(f"Estimated maturity: {crop_result['maturity_date']}")
+            if crop_result.get("open_sky_grain_yield_t_ha") is not None:
+                with st.expander("Optional: compare with modeled open sky"):
+                    percent = crop_result.get("difference_from_open_sky_percent")
+                    percent_text = f" ({percent:+.1f}%)" if percent is not None else ""
+                    st.write(
+                        f"Open-sky crop yield: {crop_result['open_sky_grain_yield_t_ha']:.2f} t/ha. "
+                        f"Difference with PV: {crop_result['difference_from_open_sky_t_ha']:+.2f} "
+                        f"t/ha{percent_text}."
+                    )
+                    st.caption(
+                        "This isolates the model's light-input effect using the same crop, "
+                        "temperature, and sowing date. It does not decide whether a PV layout "
+                        "is worthwhile or predict all field effects."
+                    )
+            st.markdown("#### Array layout and crop response")
+            import matplotlib.pyplot as plt
+            yields = crop_result["grain_yield_t_ha_by_position"]
+            low_index = min(range(len(yields)), key=yields.__getitem__)
+            light_days = (expert_last_run["output"].get("ground_light") or {}).get("light_mj_m2") or []
+            annual_light = ([sum(day[index] for day in light_days) for index in range(101)]
+                            if light_days else None)
+            if annual_light:
+                light_low = min(range(101), key=annual_light.__getitem__)
+                st.info(
+                    f"PV-MAPS predicts the least annual ground light at index {light_low}; "
+                    f"SIMPLE predicts the lowest crop yield at index {low_index} "
+                    f"({yields[low_index]:.2f} t/ha). The uneven light profile helps "
+                    "explain the uneven crop yield. Index numbers are not mapped to "
+                    "the exact footprint beneath either drawn panel."
+                )
+            layout_fig = create_array_configuration_figure(expert_last_run["input"])
+            try:
+                st.pyplot(layout_fig, use_container_width=True)
+            finally:
+                plt.close(layout_fig)
+            st.caption("Conceptual PV-MAPS row layout; proportions are not to scale.")
+            plot_count = 2 if annual_light else 1
+            fig, axes = plt.subplots(plot_count, 1, figsize=(9, 5 if annual_light else 3),
+                                     sharex=True, layout="constrained")
+            if annual_light:
+                light_ax, yield_ax = axes
+                light_ax.plot(range(101), annual_light, color="#d49b2a", linewidth=2)
+                light_ax.set_ylabel("Ground light\n(MJ/m²/year)")
+                light_ax.scatter([light_low], [annual_light[light_low]], color="#9b5622")
+            else:
+                yield_ax = axes
+            yield_ax.plot(range(len(yields)), yields, color="#74B9F0", linewidth=2)
+            yield_ax.scatter([low_index], [yields[low_index]], color="#c45c4d")
+            yield_ax.set_xlim(0, len(yields) - 1)
+            yield_ax.set_ylim(bottom=0)
+            yield_ax.set_xlabel("Ground position index (0–100; not meters)")
+            yield_ax.set_ylabel("Grain yield (t/ha)")
+            for ax in (axes if annual_light else [axes]):
+                ax.grid(axis="y", alpha=0.2)
+                ax.spines[["top", "right"]].set_visible(False)
+            try:
+                st.pyplot(fig, use_container_width=True)
+            finally:
+                plt.close(fig)
+            st.caption(
+                "These curves use the same 101 ordered ground positions. The array "
+                "drawing explains the row geometry, but PV-MAPS does not provide "
+                "verified physical coordinates for the indexed yield positions. "
+                "The mean above averages the 101 crop predictions."
+            )
+            with st.expander("How to read this crop estimate"):
+                st.write(
+                    "Lower parts of the curve indicate positions where the modeled "
+                    "ground light supports less grain yield. This is a model estimate "
+                    "for the selected crop, site, sowing date, and PV layout; it is "
+                    "not a measured field harvest."
+                )
+                st.write("Model assumptions: " + "; ".join(crop_result["assumptions"]))
+        else:
+            st.subheader(EXPERT_MODE_TEXT["explanation_header"])
+            st.write(expert_last_run["explanation"])
 
         # Follow-up chat about this specific run, grounded in the same
         # input/output plus RAG context -- resets whenever a new run
@@ -374,9 +521,16 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
             },
             *st.session_state["expert_chat_messages"],
         ]
-        render_conversation_export(
-            expert_export_messages, [expert_last_run], "expert"
-        )
+        with st.sidebar.expander("Results & details", expanded=False):
+            downloads_tab, trace_tab = st.tabs(["Downloads", "LLM trace"])
+            with downloads_tab:
+                st.caption("Export the saved run or the conversation about it.")
+                render_simulation_exports([expert_last_run], "expert")
+                render_conversation_export(
+                    expert_export_messages, [expert_last_run], "expert"
+                )
+            with trace_tab:
+                render_trace_details()
 
         expert_followup_question = st.chat_input(
             "Ask a question about this result", key="expert_chat_input"
@@ -472,20 +626,7 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
 
 
 with st.sidebar.expander(TRACE_UI_TEXT["header"], expanded=False):
-    if not st.session_state.get(SESSION_KEY_LLM_TRACE):
-        st.write(TRACE_UI_TEXT["empty_message"])
-    else:
-        for index, trace in enumerate(st.session_state[SESSION_KEY_LLM_TRACE], start=1):
-            st.markdown(f"**{index}. {trace['stage']}** `{trace['time']}`")
-            if trace.get("decision"):
-                st.write("Decision:", trace["decision"])
-            if trace.get("input") is not None:
-                st.write("Input")
-                st.json(trace["input"])
-            if trace.get("output") is not None:
-                st.write("Output")
-                st.json(trace["output"])
-            st.divider()
+    render_trace_details()
 
 
 if SESSION_KEY_USER_PROFILE not in st.session_state:
