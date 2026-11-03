@@ -12,9 +12,10 @@ def decide_rag_source(question, api_key, conversation_history=None):
     Decide whether a general_chat question should be answered with help from
     the papers collection, the books collection, both, or neither.
 
-    Falls back to "none" on any parsing failure -- same as the general
-    answerer's existing behavior with no retrieval, so a router hiccup never
-    breaks the turn.
+    Falls back to cross-collection retrieval on a parsing failure. A malformed
+    router response should not silently remove research grounding from a turn;
+    retrieving an unnecessary excerpt is safer than answering a research
+    question without the corpus.
     """
     history = recent_text_history(conversation_history, question)
     messages = [
@@ -34,8 +35,11 @@ def decide_rag_source(question, api_key, conversation_history=None):
 
     if not isinstance(plan, dict):
         return {
-            "source": RAG_SOURCE_NONE,
-            "reason": "Fallback to none because the router returned invalid JSON.",
+            "source": RAG_SOURCE_BOTH,
+            "reason": (
+                "Fallback to both collections because the router returned "
+                "invalid JSON; preserving research grounding for this turn."
+            ),
             "retrieval_query": question,
             "query_mode": "fallback",
         }

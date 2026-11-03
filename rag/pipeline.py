@@ -9,6 +9,7 @@ from constants import (
     RAG_SOURCE_PAPERS,
 )
 from rag.rag_answerer import answer_with_rag
+from rag.source_titles import display_source_title
 
 
 def load_documents_from_path(path, equation_aware=False):
@@ -244,12 +245,12 @@ def retrieve_for_source(source, query, n_results=3, db_path=None):
     """
     Retrieve chunks for a "none"/"papers"/"books"/"both" source decision.
 
-    Each collection is queried independently and failures are swallowed per
-    collection, so one missing/broken collection doesn't block retrieval
-    from the other, and any failure here just means less context rather
-    than a broken turn.
+    Each collection is queried independently so one broken collection does not
+    block results from the other. If every requested collection fails, raise a
+    compact diagnostic instead of misreporting the failure as zero matches.
     """
     retrieved_chunks = []
+    failures = []
 
     for collection_name in SOURCE_TO_COLLECTIONS.get(source, []):
         try:
@@ -261,8 +262,13 @@ def retrieve_for_source(source, query, n_results=3, db_path=None):
                     db_path=db_path,
                 )
             )
-        except Exception:
-            continue
+        except Exception as error:
+            failures.append(
+                f"{collection_name}: {type(error).__name__}: {error}"
+            )
+
+    if failures and not retrieved_chunks:
+        raise RuntimeError("Research retrieval failed; " + " | ".join(failures))
 
     return retrieved_chunks
 
@@ -275,7 +281,7 @@ def summarize_retrieved_chunks(retrieved_chunks):
     return [
         {
             "text": chunk["text"],
-            "title": chunk.get("metadata", {}).get("title"),
+            "title": display_source_title(chunk.get("metadata", {}).get("title")),
             "page": chunk.get("metadata", {}).get("page"),
             "distance": chunk.get("distance"),
         }

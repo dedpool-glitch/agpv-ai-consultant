@@ -43,8 +43,9 @@ def test_bad_rewrite_preserves_original_and_research_route(monkeypatch, fields):
 def test_invalid_router_response_does_not_crash(monkeypatch,payload):
     monkeypatch.setattr('llm.rag_source_router.call_llm',lambda *_:payload)
     result=decide_rag_source('Question?', 'key', HISTORY)
-    assert result['source']=='none'
+    assert result['source']=='both'
     assert result['retrieval_query']=='Question?'
+    assert result['query_mode']=='fallback'
 
 
 def test_no_history_or_only_current_message_preserves_original(monkeypatch):

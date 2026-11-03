@@ -114,6 +114,33 @@ def test_no_rag_decision_remains_none(monkeypatch):
     assert decision["source"] == "none"
 
 
+def test_invalid_router_json_fails_open_to_research_retrieval(monkeypatch):
+    monkeypatch.setattr(
+        "llm.rag_source_router.call_llm",
+        lambda *_args, **_kwargs: "This is not valid JSON",
+    )
+    question = (
+        "Based on that explanation, which parameter from my simulation would "
+        "most strongly affect rear-side irradiance?"
+    )
+
+    decision = decide_rag_source(
+        question,
+        "key",
+        conversation_history=[
+            {
+                "role": "assistant",
+                "content": "Rear-side irradiance depends on array geometry and ground reflection.",
+            },
+            {"role": "user", "content": question},
+        ],
+    )
+
+    assert decision["source"] == "both"
+    assert decision["retrieval_query"] == question
+    assert decision["query_mode"] == "fallback"
+
+
 def test_router_prompt_requires_research_grounding_for_contextual_followups(monkeypatch):
     captured = {}
 
@@ -146,7 +173,7 @@ def test_router_prompt_requires_research_grounding_for_contextual_followups(monk
     assert decision["query_mode"] == "contextual"
 
 
-def test_router_prompt_preserves_existing_run_exception(monkeypatch):
+def test_router_keeps_pure_existing_run_fact_question_run_only(monkeypatch):
     captured = {}
 
     def fake_call(messages, _api_key):
@@ -168,5 +195,60 @@ def test_router_prompt_preserves_existing_run_exception(monkeypatch):
         ],
     )
 
-    assert "Always choose \"none\" for a question about an existing PVMAPS run" in captured["system"]
+    assert "Choose \"none\" only when the answer is fully contained in the recorded run" in captured["system"]
     assert decision["source"] == "none"
+
+
+def test_router_retrieves_for_mixed_run_and_research_question(monkeypatch):
+    captured = {}
+
+    def fake_call(messages, _api_key):
+        captured["system"] = messages[0]["content"]
+        return json.dumps({
+            "source": "both",
+            "reason": "Use the run value and research optimization evidence.",
+            "query_mode": "standalone",
+            "retrieval_query": (
+                "Is there an equation or optimization condition used to select row spacing?"
+            ),
+        })
+
+    monkeypatch.setattr("llm.rag_source_router.call_llm", fake_call)
+    question = "Is there an equation or optimization condition used to select row spacing?"
+    decision = decide_rag_source(
+        question,
+        "key",
+        conversation_history=[
+            {"role": "assistant", "content": "Your completed run used a 5 m pitch."},
+            {"role": "user", "content": question},
+        ],
+    )
+
+    assert "An existing PVMAPS run does not disable research retrieval" in captured["system"]
+    assert "For a mixed question that connects the user's run to external knowledge" in captured["system"]
+    assert decision["source"] == "both"
+    assert decision["retrieval_query"] == question
+
+
+def test_router_retrieves_general_research_after_completed_run(monkeypatch):
+    monkeypatch.setattr(
+        "llm.rag_source_router.call_llm",
+        lambda *_args, **_kwargs: json.dumps({
+            "source": "papers",
+            "reason": "General research question after a simulation.",
+            "query_mode": "standalone",
+            "retrieval_query": "How does row spacing generally affect bifacial energy yield?",
+        }),
+    )
+    question = "How does row spacing generally affect bifacial energy yield?"
+    decision = decide_rag_source(
+        question,
+        "key",
+        conversation_history=[
+            {"role": "assistant", "content": "The PVMAPS run completed."},
+            {"role": "user", "content": question},
+        ],
+    )
+
+    assert decision["source"] == "both"
+    assert decision["retrieval_query"] == question
