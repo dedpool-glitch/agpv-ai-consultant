@@ -1,0 +1,19 @@
+case_id,question,expected_title_contains,concept
+general_001,"If I leave more space between solar panel rows, how would that affect the system?","Khan et al. - 2021|Khan et al. - 2017",row spacing
+general_002,"Why might vertical bifacial panels be useful when I still need access to the land?","Khan et al. - 2017",land access
+general_003,"How do vertical bifacial solar farms compare with tilted monofacial farms?","Khan et al. - 2017",bifacial comparison
+general_004,"What experimental or modeling evidence supports the bifacial solar farm conclusions?","A Critical Analysis of Bifacial Solar Farm Configurations",model validation
+general_005,"Can agrivoltaics help reduce land-use conflicts between farming and solar energy?","How does Module Array Design Affect the Food-Energy Productivity",land use
+general_006,"Will solar panels shade my crops too much to grow anything?","1-s2.0-S0306261922008728-main",crop shading
+general_007,"Is ground-sculpted vertical bifacial actually different from regular vertical bifacial?","A Critical Analysis of Bifacial Solar Farm Configurations",ground sculpting
+general_008,"What is the tradeoff between single-axis tracking and fixed-tilt bifacial systems?","Khan et al. - 2021|Patel et al. - 2019",tracking comparison
+general_009,"How does soiling loss affect vertical bifacial performance compared with tilted monofacial?","Khan et al. - 2017|Patel et al. - 2019",soiling
+general_010,"At what latitude does tilted monofacial start to outperform vertical bifacial?","Patel et al. - 2019",latitude dependence
+general_011,"What machine learning approaches predict solar farm performance at scale?","Jahangir and Alam - 2025",machine learning
+general_012,"How do perovskite-silicon tandem cells affect utility-scale bifacial farm economics?","Jahangir et al. - 2024",tandem economics
+general_013,"What experimental setups validate bifacial yield models against real-world data?","A Critical Analysis of Bifacial Solar Farm Configurations",experimental validation
+general_014,"What are the main barriers to wider agrivoltaics adoption?","How does Module Array Design Affect the Food-Energy Productivity|1-s2.0-S0306261925002880-main",adoption barriers
+general_015,"What crop-yield tradeoffs should be considered for agrivoltaic systems?","1-s2.0-S0306261922008728-main",crop yield
+general_016,"Does installing panels over crops reduce irrigation requirements?","1-s2.0-S0306261925002880-main|How does Module Array Design Affect the Food-Energy Productivity",water use
+general_017,"What evidence connects agrivoltaics with food security or continued agricultural production?","How does Module Array Design Affect the Food-Energy Productivity|1-s2.0-S0306261922008728-main",food security
+general_018,"Can published studies determine exactly how much money a farm would save by switching to vertical bifacial panels?","Khan et al. - 2017|Patel et al. - 2019",cost evidence
