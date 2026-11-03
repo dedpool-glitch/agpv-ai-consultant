@@ -7,5 +7,6 @@ outputs/
 candidate_history.csv
 redundant.py
 resources/
-.venv/.venv-rag-gpu/
+.venv/
+.venv-rag-gpu/
 /chroma_db/

@@ -59,6 +59,16 @@ def self_test(application):
             matches = collection.query(query_embeddings=sample["embeddings"], n_results=1)
             assert matches["ids"][0], f"No vector match in {collection.name}"
     print("PASS: stored-vector retrieval (no embedding download)", flush=True)
+    from constants import PAPERS_COLLECTION_NAME
+    from rag.pipeline import search_collection_adaptive
+    text_matches = search_collection_adaptive(
+        PAPERS_COLLECTION_NAME,
+        "Why does photovoltaic module temperature reduce electrical efficiency?",
+        n_results=1,
+    )
+    if not text_matches:
+        raise RuntimeError("Packaged text-query retrieval returned no matches")
+    print("PASS: text-query embedding and retrieval", flush=True)
     import onnxruntime
     print("PASS: Chroma and ONNX runtime loaded", onnxruntime.__version__, flush=True)
     from models.pvmaps.matlab_runner import check_matlab

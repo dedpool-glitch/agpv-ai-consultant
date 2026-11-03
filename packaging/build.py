@@ -20,7 +20,10 @@ def main():
     args = parser.parse_args()
     if sys.platform != "win32":
         parser.error("Build this Windows executable on Windows.")
-    required = ["PyInstaller", "streamlit", "matlabengine", "chromadb", "onnxruntime"]
+    required = [
+        "PyInstaller", "streamlit", "matlabengine", "chromadb", "onnxruntime",
+        "tokenizers", "tqdm",
+    ]
     if args.obfuscate:
         required.append("pyarmor")
     for name in required:

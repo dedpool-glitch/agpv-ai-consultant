@@ -8,7 +8,9 @@ work = Path(os.environ['AGPV_BUILD_WORK'])
 stage = work / 'application'
 local_modules = json.loads((work / 'modules.json').read_text(encoding='utf-8'))
 datas, binaries, hidden = [], [], list(local_modules)
-for package in ('streamlit', 'chromadb', 'onnxruntime', 'matlab'):
+# Chroma imports tokenizers and tqdm dynamically when embedding text queries,
+# so PyInstaller cannot discover them from the ordinary import graph.
+for package in ('streamlit', 'chromadb', 'onnxruntime', 'tokenizers', 'tqdm', 'matlab'):
     package_data, package_binaries, package_imports = collect_all(package)
     datas += package_data
     binaries += package_binaries
