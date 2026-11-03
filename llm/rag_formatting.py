@@ -1,3 +1,6 @@
+from rag.source_titles import display_source_title
+
+
 def format_retrieved_context(retrieved_context):
     """
     Format a list of retrieved RAG chunks (as returned by rag.pipeline.retrieve_for_source)
@@ -13,7 +16,7 @@ def format_retrieved_context(retrieved_context):
     context_blocks = []
     for index, chunk in enumerate(retrieved_context, start=1):
         metadata = chunk.get("metadata", {})
-        title = metadata.get("title", "Unknown source")
+        title = display_source_title(metadata.get("title"))
         page = metadata.get("page", "unknown page")
         context_blocks.append(f"Excerpt {index} ({title}, page {page}):\n{chunk['text']}")
 

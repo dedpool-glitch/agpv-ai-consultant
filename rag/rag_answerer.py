@@ -1,5 +1,6 @@
 from llm.prompts import RAG_ANSWER_SYSTEM_PROMPT
 from llm.client import call_llm
+from rag.source_titles import display_source_title
 
 
 def format_retrieved_context(retrieved_chunks):
@@ -8,7 +9,7 @@ def format_retrieved_context(retrieved_chunks):
     for index, chunk in enumerate(retrieved_chunks, start=1):
         metadata = chunk["metadata"]
 
-        title = metadata.get("title", "Unknown source")
+        title = display_source_title(metadata.get("title"))
         page = metadata.get("page", "unknown page")
         headings = metadata.get("headings", "")
         record_type = metadata.get("record_type", "context")
