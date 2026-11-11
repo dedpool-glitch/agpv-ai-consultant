@@ -47,6 +47,27 @@ user profile and optional site location
 - geopy
 - pytest
 
+## Personal research library
+
+In Guided or Expert mode, open **My library** to add searchable PDFs. The app
+extracts text, indexes short passages in a separate local Chroma collection,
+and searches those passages alongside the shared CEED library when answering
+general questions or Expert follow-ups. Answers list the retrieved sources.
+Scanned PDFs need OCR before upload; a PDF may be at most 20 MB and 100 pages.
+
+On Windows, the original PDFs and personal vector index live in
+`%LOCALAPPDATA%\AgPV-Assistant\personal_library`, outside this repository.
+The folder belongs to the Windows account running the app. Removing a PDF from
+**My library** removes its stored original and index entries. While personal
+PDFs are present, conversation logs are kept in that same local folder rather
+than sent to the shared research sheet; the local log still contains questions
+and answers. Relevant passages may be sent to the configured AI service to
+answer a question.
+
+This is local Windows-account separation, not browser-user authentication. A
+future shared web deployment would need login and a user-scoped storage path
+before different visitors could have private libraries on one server.
+
 ## Project Structure
 
 ```text

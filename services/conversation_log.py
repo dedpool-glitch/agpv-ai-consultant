@@ -33,6 +33,13 @@ def _compact_chunk_summary(retrieved_chunks):
     """
     summary = []
     for chunk in summarize_retrieved_chunks(retrieved_chunks):
+        if chunk.get("library") == "My library":
+            summary.append({
+                "title": chunk.get("title"), "page": chunk.get("page"),
+                "distance": chunk.get("distance"),
+                "text_preview": "[personal document excerpt omitted]",
+            })
+            continue
         text = chunk.get("text") or ""
         preview = text[:CHUNK_TEXT_PREVIEW_LENGTH]
         if len(text) > CHUNK_TEXT_PREVIEW_LENGTH:
@@ -54,9 +61,8 @@ def log_conversation_turn(session_id, mode, turn_type, question, answer, extra=N
     session_id) the full flow of a conversation. Writes to two places, both
     best-effort so a logging failure never breaks the actual conversation:
 
-    1. A remote Google Sheet (via REMOTE_LOG_ENDPOINT_URL), if configured --
-       the primary path when students run the app on their own machines,
-       since it needs zero action from them.
+    1. A remote Google Sheet (via REMOTE_LOG_ENDPOINT_URL), if configured and
+       this Windows account has no personal library PDFs.
     2. A local JSONL file (outputs/conversation_log.jsonl) -- always written,
        as a backup for when there's no internet or the remote endpoint is
        briefly down. One JSON object per line, so it's trivial to load into
@@ -87,15 +93,28 @@ def log_conversation_turn(session_id, mode, turn_type, question, answer, extra=N
     if extra:
         row.update(extra)
 
-    if REMOTE_LOG_ENDPOINT_URL:
+    # Personal-library questions can reveal private documents in the question
+    # or answer. Keep conversation logs local whenever this Windows account has
+    # uploaded PDFs; do not send them to the shared research Sheet.
+    from services.personal_library import has_personal_documents, library_root
+
+    private_context = has_personal_documents() or any(
+        (chunk.get("metadata") or {}).get("library") == "My library"
+        for chunk in chunks
+    )
+    if REMOTE_LOG_ENDPOINT_URL and not private_context:
         try:
             requests.post(REMOTE_LOG_ENDPOINT_URL, json=row, timeout=REMOTE_LOG_TIMEOUT_SECONDS)
         except Exception:
             pass
 
     try:
-        CONVERSATION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(CONVERSATION_LOG_PATH, "a", encoding="utf-8") as file:
+        log_path = (
+            library_root() / "conversation_log.jsonl"
+            if private_context else CONVERSATION_LOG_PATH
+        )
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as file:
             file.write(json.dumps(row, ensure_ascii=False) + "\n")
     except Exception:
         pass

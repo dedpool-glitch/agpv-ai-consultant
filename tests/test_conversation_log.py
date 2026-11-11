@@ -69,3 +69,31 @@ def test_log_records_retrieval_and_evaluation_metadata(tmp_path, monkeypatch):
     assert row["retrieved_chunks"][0]["page"] == 7
     assert row["retrieval_query"] == "row spacing bifacial solar farm yield"
     assert row["response_time_ms"] == 1250
+
+
+def test_personal_library_keeps_conversation_off_remote_sheet(tmp_path, monkeypatch):
+    library = tmp_path / "personal_library"
+    documents = library / "documents"
+    documents.mkdir(parents=True)
+    (documents / "saved.pdf").write_bytes(b"private")
+    monkeypatch.setenv("AGPV_PERSONAL_LIBRARY_ROOT", str(library))
+    monkeypatch.setattr(conversation_log, "CONVERSATION_LOG_PATH", tmp_path / "conversation.jsonl")
+    monkeypatch.setattr(conversation_log, "REMOTE_LOG_ENDPOINT_URL", "https://example.invalid/log")
+
+    def unexpected_post(*_args, **_kwargs):
+        raise AssertionError("Personal conversation must not be uploaded")
+
+    monkeypatch.setattr(conversation_log.requests, "post", unexpected_post)
+    conversation_log.log_conversation_turn(
+        "session", "guided", "general_question", "Question about my paper", "Answer",
+        retrieved_chunks=[{
+            "text": "private excerpt",
+            "metadata": {"library": "My library", "title": "My paper", "page": 1},
+            "distance": 0.1,
+        }],
+    )
+    personal_log_path = library / "conversation_log.jsonl"
+    row = _read_single_row(personal_log_path)
+    assert row["retrieved_chunks"][0]["text_preview"] == "[personal document excerpt omitted]"
+    assert "private excerpt" not in personal_log_path.read_text(encoding="utf-8")
+    assert not (tmp_path / "conversation.jsonl").exists()

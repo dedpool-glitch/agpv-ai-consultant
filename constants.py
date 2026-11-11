@@ -104,8 +104,8 @@ QUESTIONNAIRE_UI_TEXT = {
 
 CHAT_UI_TEXT = {
     "description": "",
-    "answer_label": "Ask a question, or tell me about your project",
-    "opening_message": "Hi! Ask me anything about agrivoltaics, or tell me about your project and I can put together a solar-yield estimate when you're ready.",
+    "answer_label": "Ask a question or request a solar, crop, or combined estimate",
+    "opening_message": "Hi! Ask me about agrivoltaics or tell me about your project. I can estimate solar yield, crop yield without panels, or both together under a PV layout.",
 }
 
 PROCESSING_STATUS_TEXT = {
@@ -115,7 +115,7 @@ PROCESSING_STATUS_TEXT = {
     "retrieval": "Searching research sources...",
     "configuration": "Preparing simulation inputs...",
     "validation": "Validating the configuration...",
-    "simulation": "Running PVMAPS...",
+    "simulation": "Running PV-MAPS...",
     "explanation": "Interpreting the results...",
     "answer": "Preparing the response...",
     "complete": "Complete",
@@ -144,8 +144,8 @@ RESULT_TEXT = {
 }
 
 TRACE_UI_TEXT = {
-    "header": "LLM Trace",
-    "empty_message": "No LLM calls have been logged yet.",
+    "header": "Activity details",
+    "empty_message": "No routing or simulation activity has been recorded yet.",
 }
 
 PANEL_DEFAULT_SPECS = {
@@ -266,15 +266,15 @@ MONTH_LABELS = [
 ]
 
 USER_PROFILE_TEXT={
-    "header":"Tell us about yourself and your background to help us tailor the experience.",
-    "user_type_label":"Which of these best describes you?",
+    "header":"Set up your consultation",
+    "user_type_label":"Your role",
     "user_role_label":"Describe your role in your own words",
-    "solar_experience_label":"How would you describe your experience with solar farm design?",
-    "project_goal_label":"What is your objective today?",
-    "site_location_label":"Please enter a site location if you have one",
+    "solar_experience_label":"Solar design experience",
+    "project_goal_label":"What would you like to do?",
+    "site_location_label":"Site location (optional for general questions)",
     "site_location_placeholder":"Lafayette, Indiana",
     "goal_details_label":"Tell us more about your goal",
-    "submit_button":"Upload profile",
+    "submit_button":"Continue to chat",
 }
 
 USER_TYPE_OPTIONS = [
@@ -387,16 +387,16 @@ ACCESS_PASSCODE_TEXT = {
 }
 
 EXPERT_MODE_TEXT = {
-    "mode_selector_header": "Choose a mode",
+    "mode_selector_header": "How would you like to begin?",
     "non_expert_button": "Guided mode",
-    "non_expert_description": "Chat with the AgPV Assistant.",
+    "non_expert_description": "Describe your project; the assistant picks the right estimate.",
     "expert_button": "Expert mode",
-    "expert_description": "Manually set PVMAPS params and run the simulation.",
+    "expert_description": "Choose the analysis and enter the PV configuration yourself.",
     "switch_mode_button": "Switch mode",
-    "form_header": "Set PVMAPS parameters",
-    "run_button": "Run PVMAPS",
-    "missing_location_error": "Please confirm a site location before running PVMAPS.",
-    "validation_error_header": "Fix the following before running PVMAPS:",
+    "form_header": "Configure an estimate",
+    "run_button": "Estimate solar yield",
+    "missing_location_error": "Confirm a site location before generating this estimate.",
+    "validation_error_header": "Fix these inputs before generating the estimate:",
     "explanation_header": "Output explanation",
-    "simulation_error": "PVMAPS simulation failed.",
+    "simulation_error": "The simulation could not complete.",
 }

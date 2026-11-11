@@ -17,6 +17,8 @@ def format_retrieved_context(retrieved_context):
     for index, chunk in enumerate(retrieved_context, start=1):
         metadata = chunk.get("metadata", {})
         title = display_source_title(metadata.get("title"))
+        if metadata.get("library"):
+            title = f"{metadata['library']}: {title}"
         page = metadata.get("page", "unknown page")
         context_blocks.append(f"Excerpt {index} ({title}, page {page}):\n{chunk['text']}")
 

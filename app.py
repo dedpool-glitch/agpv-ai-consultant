@@ -6,6 +6,7 @@ import time
 import uuid
 from datetime import date
 from dotenv import load_dotenv
+import pandas as pd
 
 import traceback 
 
@@ -57,23 +58,31 @@ from models.pvmaps.descriptor import (
     get_pvmaps_input_descriptors,
     validate_pvmaps_descriptor_input,
 )
+from models.simple.crops import CROP_FILES
 from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
 from services.conversation_log import log_conversation_turn
 from services.expert_estimate_service import run_expert_pvmaps_estimate
 from services.combined_estimate_service import run_combined_estimate
 from services.llm_trace import add_llm_trace
+from services.guided_crop_request import resolve_crop_analysis, resolve_crop_inputs
+from services.guided_simple_estimate_service import run_guided_open_sky_estimate
+from services.run_context import compact_run
+from services.simulation_log import log_simulation_run
 from services.pvmaps_estimate_service import run_recommended_pvmaps_estimate
 from ui.simulation_result import render_simulation_result
-from ui.simulation_comparison import render_simulation_comparison
+from ui.simulation_comparison import distinct_solar_runs, render_simulation_comparison
 from ui.simulation_export import render_simulation_exports
 from ui.conversation_export import render_conversation_export
-from ui.array_visualization import create_array_configuration_figure
+from ui.crop_visualization import render_crop_with_pv
+from ui.crop_comparison import render_crop_comparison
+from ui.personal_library import render_personal_library, render_retrieved_sources
+from services.personal_library import search_documents
 
 load_dotenv()
-st.set_page_config(layout="wide")
-st.title(APP_TITLE)
+st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 
 PENDING_CHAT_QUESTION_KEY = "pending_chat_question"
+PENDING_CROP_REQUEST_KEY = "pending_crop_request"
 
 # One id per browser session, used only to group conversation_log.jsonl rows
 # back into a single conversation later -- not tied to any account/identity.
@@ -87,6 +96,7 @@ _access_passcode = os.getenv(ACCESS_PASSCODE_ENV_VAR)
 if _access_passcode:
     st.session_state.setdefault(SESSION_KEY_ACCESS_PASSCODE_OK, False)
     if not st.session_state[SESSION_KEY_ACCESS_PASSCODE_OK]:
+        st.title(APP_TITLE)
         st.subheader(ACCESS_PASSCODE_TEXT["header"])
         st.write(ACCESS_PASSCODE_TEXT["description"])
         entered_passcode = st.text_input(ACCESS_PASSCODE_TEXT["label"], type="password")
@@ -107,6 +117,7 @@ st.session_state.setdefault(SESSION_KEY_API_KEY, None)
 api_key = os.getenv(GENAI_API_KEY_ENV_VAR) or st.session_state[SESSION_KEY_API_KEY]
 
 if not api_key:
+    st.title(APP_TITLE)
     st.subheader(API_KEY_TEXT["header"])
     st.write(API_KEY_TEXT["description"])
     entered_api_key = st.text_input(API_KEY_TEXT["label"], type="password")
@@ -132,6 +143,20 @@ def _chat_api_error_message(error):
     if status_code == 429:
         return "The AI service rate limit was reached. Please wait briefly and try again."
     return "The AI service could not respond. Your message has been kept; please try again shortly."
+
+
+def _requests_crop_estimate(message):
+    normalized = " ".join(str(message or "").casefold().split())
+    crop_topic = (
+        "crop yield" in normalized or "grain yield" in normalized
+        or "simple model" in normalized
+        or ("yield" in normalized and any(crop in normalized for crop in CROP_FILES))
+    )
+    new_estimate = any(phrase in normalized for phrase in (
+        "estimate", "calculate", "predict", "simulate", "run ",
+        "what would", "what will", "how much", "what is my", "give me",
+    ))
+    return crop_topic and new_estimate
 
 # Render the forms based on model description provided in pvmaps.json 
 def _render_descriptor_input(field, container=st, disabled=False):
@@ -194,50 +219,175 @@ def _render_descriptor_input(field, container=st, disabled=False):
 st.session_state.setdefault(SESSION_KEY_APP_MODE, None)
 
 if st.session_state[SESSION_KEY_APP_MODE] is None:
-    st.subheader(EXPERT_MODE_TEXT["mode_selector_header"])
-    mode_col1, mode_col2 = st.columns(2)
-    with mode_col1:
-        st.write(EXPERT_MODE_TEXT["non_expert_description"])
-        if st.button(EXPERT_MODE_TEXT["non_expert_button"]):
-            st.session_state[SESSION_KEY_APP_MODE] = APP_MODE_NON_EXPERT
-            st.rerun()
-    with mode_col2:
-        st.write(EXPERT_MODE_TEXT["expert_description"])
-        if st.button(EXPERT_MODE_TEXT["expert_button"]):
-            st.session_state[SESSION_KEY_APP_MODE] = APP_MODE_EXPERT
-            st.rerun()
+    _, landing_column, _ = st.columns([1, 4, 1])
+    with landing_column:
+        st.title(APP_TITLE)
+        st.subheader(EXPERT_MODE_TEXT["mode_selector_header"])
+        guided_column, expert_column = st.columns([1, 1], gap="medium")
+        with guided_column, st.container(border=True, width="stretch", height=260):
+            st.markdown("#### Guided mode")
+            st.write(EXPERT_MODE_TEXT["non_expert_description"])
+            st.caption("Ask about solar yield, crop yield without panels, or both together.")
+            if st.button(EXPERT_MODE_TEXT["non_expert_button"], type="primary", width="stretch"):
+                st.session_state[SESSION_KEY_APP_MODE] = APP_MODE_NON_EXPERT
+                st.rerun()
+        with expert_column, st.container(border=True, width="stretch", height=260):
+            st.markdown("#### Expert mode")
+            st.write(EXPERT_MODE_TEXT["expert_description"])
+            st.caption("Run and compare solar or combined estimates.")
+            if st.button(EXPERT_MODE_TEXT["expert_button"], type="primary", width="stretch"):
+                st.session_state[SESSION_KEY_APP_MODE] = APP_MODE_EXPERT
+                st.rerun()
     st.stop()
-
-with st.sidebar:
-    if st.button(EXPERT_MODE_TEXT["switch_mode_button"]):
-        st.session_state[SESSION_KEY_APP_MODE] = None
-        st.rerun()
-
 
 def render_trace_details():
     traces = st.session_state.get(SESSION_KEY_LLM_TRACE) or []
     if not traces:
         st.write(TRACE_UI_TEXT["empty_message"])
         return
-    for index, trace in enumerate(traces, start=1):
-        st.markdown(f"**{index}. {trace['stage']}** `{trace['time']}`")
-        if trace.get("decision"):
-            st.write("Decision:", trace["decision"])
-        if trace.get("input") is not None:
-            st.write("Input")
-            st.json(trace["input"])
-        if trace.get("output") is not None:
-            st.write("Output")
-            st.json(trace["output"])
-        st.divider()
+    st.caption("How the assistant handled this session. Open a step to inspect its technical details.")
+    show_all = st.toggle("Show all activity", value=False) if len(traces) > 8 else False
+    visible_traces = traces if show_all else traces[-8:]
+    if len(traces) > 8 and not show_all:
+        st.caption(f"Showing the latest 8 of {len(traces)} steps.")
+    stage_labels = {
+        "turn_router": "Interpreting the request",
+        "recommendation_context_retrieval": "Checking research for PV recommendations",
+        "recommended_pvmaps_config": "Choosing PV inputs",
+        "pvmaps_background_tool": "PV-MAPS solar simulation",
+        "combined_simulation": "PV-MAPS + SIMPLE simulation",
+        "guided_simple_run": "SIMPLE crop simulation",
+        "expert_mode_pvmaps_run": "PV-MAPS solar simulation",
+        "expert_combined_run": "PV-MAPS + SIMPLE simulation",
+    }
+    first_index = len(traces) - len(visible_traces) + 1
+    for index, trace in enumerate(visible_traces, start=first_index):
+        label = stage_labels.get(trace['stage'], trace['stage'].replace('_', ' ').title())
+        with st.expander(f"{index}. {label} · {trace['time']}", expanded=False):
+            if trace.get("decision"):
+                st.write("Decision:", trace["decision"].replace("_", " "))
+            if trace.get("input") is not None:
+                st.caption("Input")
+                st.json(trace["input"], expanded=False)
+            if trace.get("output") is not None:
+                st.caption("Output")
+                st.json(trace["output"], expanded=False)
+
+
+@st.dialog(TRACE_UI_TEXT["header"], width="large")
+def show_trace_dialog():
+    render_trace_details()
+
+
+def retrieve_personal_context(query):
+    try:
+        chunks = search_documents(query, n_results=3)
+    except Exception as error:
+        st.warning("My library could not be searched for this question.")
+        add_llm_trace(
+            st.session_state, "personal_library_retrieval",
+            input_summary={"query": query}, output={"error": str(error)},
+            decision="personal_retrieval_failed",
+        )
+        return []
+    if chunks:
+        add_llm_trace(
+            st.session_state, "personal_library_retrieval",
+            input_summary={"query": query},
+            output={"retrieved_count": len(chunks),
+                    "sources": summarize_retrieved_chunks(chunks)},
+            decision="personal_chunks_retrieved",
+        )
+    return chunks
+
+
+def render_workspace_header(mode, location_context=None):
+    """Keep mode, site, and library controls together below the app title."""
+    st.title(APP_TITLE)
+    # One control per concept, and the control is its own label: a mode toggle,
+    # a site chip, and the library chip. Session context (mode, site) sits on
+    # the left; the library tool sits alone on the right. Every item here is a
+    # content-width widget -- no bare text elements, which stretch to fill the
+    # row and push neighbors apart.
+    left_column, right_column = st.columns([8, 1.7], gap="small", vertical_alignment="center")
+    toolbar = left_column.container(horizontal=True, gap="small", vertical_alignment="center")
+    library_slot = right_column.container(horizontal=True, horizontal_alignment="right")
+
+    mode_labels = {APP_MODE_NON_EXPERT: "Guided", APP_MODE_EXPERT: "Expert"}
+    with toolbar:
+        selected_mode = st.segmented_control(
+            "Mode", options=list(mode_labels), default=mode,
+            format_func=mode_labels.get, required=True,
+            key=f"{mode}_mode_switch", label_visibility="collapsed",
+        )
+    if selected_mode and selected_mode != mode:
+        st.session_state[SESSION_KEY_APP_MODE] = selected_mode
+        st.rerun()
+
+    def render_header_tools(key_prefix):
+        with library_slot:
+            render_personal_library(key_prefix)
+            if st.session_state.get(SESSION_KEY_LLM_TRACE):
+                if st.button("Activity", icon=":material/history:", key=f"{key_prefix}_activity"):
+                    show_trace_dialog()
+
+    if mode == APP_MODE_EXPERT:
+        render_header_tools("expert")
+        return
+
+    location_context = location_context or {}
+    lat = location_context.get("latitude")
+    lon = location_context.get("longitude")
+    address = location_context.get("confirmed_address")
+    if address:
+        site_label = location_context.get("site_location") or ", ".join(address.split(",")[:2])
+        site_help = "Change site"
+    else:
+        site_label = "Add site"
+        site_help = None
+
+    with toolbar, st.popover(site_label, icon=":material/location_on:", help=site_help):
+        if address:
+            st.write(f"Matched address: {address}")
+            st.write(f"Latitude: {lat:.6f}° · Longitude: {lon:.6f}°")
+            st.caption("The map pin shows the matched location, not a verified farm boundary.")
+            st.map(pd.DataFrame({"lat": [lat], "lon": [lon]}), zoom=12, height=240)
+        with st.form("guided_site_change_form"):
+            new_site = st.text_input(
+                "Search for a site", value=location_context.get("site_location") or "",
+                placeholder="City, state or region",
+            )
+            change_site = st.form_submit_button("Use this site")
+        if change_site:
+            try:
+                coordinates = geocode_location(new_site)
+            except Exception:
+                st.error("I could not confirm that location. Try a more specific city or region.")
+            else:
+                st.session_state[SESSION_KEY_LOCATION_CONTEXT] = {
+                    "site_location": new_site.strip(),
+                    "confirmed_address": coordinates["address"],
+                    "latitude": coordinates["latitude"],
+                    "longitude": coordinates["longitude"],
+                }
+                st.session_state.pop(SESSION_KEY_QUESTIONNAIRE_STATE, None)
+                st.rerun()
+    render_header_tools("guided")
 
 
 # Expert mode interface 
 if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
+    render_workspace_header(APP_MODE_EXPERT)
     st.subheader(EXPERT_MODE_TEXT["form_header"])
+    st.session_state.setdefault("expert_runs", [])
     expert_analysis = st.radio(
         "Analysis", ["Solar yield", "Solar + crop yield"], horizontal=True,
         key="expert_analysis",
+    )
+    st.caption(
+        "Runs PV-MAPS for solar output and SIMPLE for crop yield using modeled ground light."
+        if expert_analysis == "Solar + crop yield"
+        else "Runs PV-MAPS for solar output."
     )
 
     # Fields render in a grid, this many per row, grouped under each
@@ -281,7 +431,7 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
     if expert_analysis == "Solar + crop yield":
         st.markdown("### 2. Crop and planting")
         crop_name = st.selectbox(
-            "Crop type", ["maize", "rice", "sorghum", "soybean"],
+            "Crop type", list(CROP_FILES),
             format_func=str.title,
         )
         st.caption(
@@ -334,7 +484,11 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                         ),
                     )
 
-    if st.button(EXPERT_MODE_TEXT["run_button"]):
+    expert_action_label = (
+        "Estimate solar + crop yield" if expert_analysis == "Solar + crop yield"
+        else EXPERT_MODE_TEXT["run_button"]
+    )
+    if st.button(expert_action_label, type="primary"):
         if not expert_location_context:
             st.error(EXPERT_MODE_TEXT["missing_location_error"])
         else:
@@ -362,7 +516,7 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                 try:
                     crop_result = None
                     if expert_analysis == "Solar + crop yield":
-                        expert_status.update(label="Running PV and crop models")
+                        expert_status.update(label="Running PV-MAPS and SIMPLE...")
                         combined = run_combined_estimate(
                             expert_pvmaps_input, crop_name, sowing_date,
                         )
@@ -384,6 +538,8 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                             ),
                         )
                     st.session_state["expert_last_run"] = {
+                        "analysis": "solar_and_crop" if crop_result else "solar",
+                        "label": "Solar + crop estimate" if crop_result else "Solar-yield estimate",
                         "location_context": copy.deepcopy(expert_location_context),
                         "input_provenance": {"source": "expert_form"},
                         "input": expert_pvmaps_input,
@@ -391,6 +547,43 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                         "explanation": expert_explanation,
                         "crop_result": crop_result,
                     }
+                    st.session_state["expert_runs"].append(
+                        copy.deepcopy(st.session_state["expert_last_run"])
+                    )
+                    log_simulation_run(
+                        st.session_state["session_id"], "expert",
+                        st.session_state["expert_last_run"],
+                    )
+                    log_conversation_turn(
+                        st.session_state["session_id"], "expert", "run_model",
+                        expert_analysis, expert_explanation,
+                        extra={
+                            "analysis": "solar_and_crop" if crop_result else "solar",
+                            "location_context": expert_location_context,
+                            "crop": crop_name if crop_result else None,
+                            "sowing_date": sowing_date.isoformat() if crop_result else None,
+                            "solar_yield": expert_output.get("yearly_yield"),
+                            "solar_yield_unit": expert_output.get("yield_unit"),
+                            "mean_grain_yield_t_ha": (
+                                crop_result["mean_grain_yield_t_ha"] if crop_result else None
+                            ),
+                        },
+                    )
+                    if crop_result:
+                        add_llm_trace(
+                            st.session_state, "expert_combined_run",
+                            input_summary={
+                                "crop": crop_name, "sowing_date": sowing_date.isoformat(),
+                                "pvmaps_input": expert_pvmaps_input,
+                            },
+                            output={
+                                "solar_yield": expert_output.get("yearly_yield"),
+                                "solar_unit": expert_output.get("yield_unit"),
+                                "mean_crop_yield_t_ha": crop_result["mean_grain_yield_t_ha"],
+                                "maturity_date": crop_result["maturity_date"],
+                            },
+                            decision="combined_estimate_completed",
+                        )
                     # A new run means any previous follow-up chat no longer
                     # applies to what's on screen -- start fresh.
                     st.session_state["expert_chat_messages"] = []
@@ -403,13 +596,24 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                         label=PROCESSING_STATUS_TEXT["failed"],
                         state="error",
                     )
-                    st.error(EXPERT_MODE_TEXT["simulation_error"])
+                    st.error(
+                        "The PV-MAPS + SIMPLE estimate could not complete."
+                        if expert_analysis == "Solar + crop yield"
+                        else "The PV-MAPS estimate could not complete."
+                    )
                     add_llm_trace(
                         st.session_state,
-                        "expert_mode_pvmaps_run",
+                        "expert_combined_run" if expert_analysis == "Solar + crop yield"
+                        else "expert_mode_pvmaps_run",
                         input_summary={"pvmaps_input": expert_pvmaps_input},
                         output={"error": str(error)},
                         decision="expert_estimate_failed",
+                    )
+                    log_conversation_turn(
+                        st.session_state["session_id"], "expert", "run_model",
+                        expert_analysis, "Simulation failed",
+                        extra={"analysis": "solar_and_crop" if expert_analysis == "Solar + crop yield"
+                               else "solar", "error": str(error)},
                     )
                     st.error(traceback.format_exc())
 
@@ -419,86 +623,12 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
     if expert_last_run:
         render_simulation_result(expert_last_run)
         if expert_last_run.get("crop_result"):
-            crop_result = expert_last_run["crop_result"]
-            st.subheader("Crop yield")
-            st.metric("Mean grain yield with PV", f"{crop_result['mean_grain_yield_t_ha']:.2f} t/ha")
-            st.write(f"Estimated maturity: {crop_result['maturity_date']}")
-            if crop_result.get("open_sky_grain_yield_t_ha") is not None:
-                with st.expander("Optional: compare with modeled open sky"):
-                    percent = crop_result.get("difference_from_open_sky_percent")
-                    percent_text = f" ({percent:+.1f}%)" if percent is not None else ""
-                    st.write(
-                        f"Open-sky crop yield: {crop_result['open_sky_grain_yield_t_ha']:.2f} t/ha. "
-                        f"Difference with PV: {crop_result['difference_from_open_sky_t_ha']:+.2f} "
-                        f"t/ha{percent_text}."
-                    )
-                    st.caption(
-                        "This isolates the model's light-input effect using the same crop, "
-                        "temperature, and sowing date. It does not decide whether a PV layout "
-                        "is worthwhile or predict all field effects."
-                    )
-            st.markdown("#### Array layout and crop response")
-            import matplotlib.pyplot as plt
-            yields = crop_result["grain_yield_t_ha_by_position"]
-            low_index = min(range(len(yields)), key=yields.__getitem__)
-            light_days = (expert_last_run["output"].get("ground_light") or {}).get("light_mj_m2") or []
-            annual_light = ([sum(day[index] for day in light_days) for index in range(101)]
-                            if light_days else None)
-            if annual_light:
-                light_low = min(range(101), key=annual_light.__getitem__)
-                st.info(
-                    f"PV-MAPS predicts the least annual ground light at index {light_low}; "
-                    f"SIMPLE predicts the lowest crop yield at index {low_index} "
-                    f"({yields[low_index]:.2f} t/ha). The uneven light profile helps "
-                    "explain the uneven crop yield. Index numbers are not mapped to "
-                    "the exact footprint beneath either drawn panel."
-                )
-            layout_fig = create_array_configuration_figure(expert_last_run["input"])
-            try:
-                st.pyplot(layout_fig, use_container_width=True)
-            finally:
-                plt.close(layout_fig)
-            st.caption("Conceptual PV-MAPS row layout; proportions are not to scale.")
-            plot_count = 2 if annual_light else 1
-            fig, axes = plt.subplots(plot_count, 1, figsize=(9, 5 if annual_light else 3),
-                                     sharex=True, layout="constrained")
-            if annual_light:
-                light_ax, yield_ax = axes
-                light_ax.plot(range(101), annual_light, color="#d49b2a", linewidth=2)
-                light_ax.set_ylabel("Ground light\n(MJ/m²/year)")
-                light_ax.scatter([light_low], [annual_light[light_low]], color="#9b5622")
-            else:
-                yield_ax = axes
-            yield_ax.plot(range(len(yields)), yields, color="#74B9F0", linewidth=2)
-            yield_ax.scatter([low_index], [yields[low_index]], color="#c45c4d")
-            yield_ax.set_xlim(0, len(yields) - 1)
-            yield_ax.set_ylim(bottom=0)
-            yield_ax.set_xlabel("Ground position index (0–100; not meters)")
-            yield_ax.set_ylabel("Grain yield (t/ha)")
-            for ax in (axes if annual_light else [axes]):
-                ax.grid(axis="y", alpha=0.2)
-                ax.spines[["top", "right"]].set_visible(False)
-            try:
-                st.pyplot(fig, use_container_width=True)
-            finally:
-                plt.close(fig)
-            st.caption(
-                "These curves use the same 101 ordered ground positions. The array "
-                "drawing explains the row geometry, but PV-MAPS does not provide "
-                "verified physical coordinates for the indexed yield positions. "
-                "The mean above averages the 101 crop predictions."
-            )
-            with st.expander("How to read this crop estimate"):
-                st.write(
-                    "Lower parts of the curve indicate positions where the modeled "
-                    "ground light supports less grain yield. This is a model estimate "
-                    "for the selected crop, site, sowing date, and PV layout; it is "
-                    "not a measured field harvest."
-                )
-                st.write("Model assumptions: " + "; ".join(crop_result["assumptions"]))
+            render_crop_with_pv(expert_last_run)
         else:
             st.subheader(EXPERT_MODE_TEXT["explanation_header"])
             st.write(expert_last_run["explanation"])
+
+        render_crop_comparison(st.session_state["expert_runs"], "expert")
 
         # Follow-up chat about this specific run, grounded in the same
         # input/output plus RAG context -- resets whenever a new run
@@ -508,6 +638,7 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
         for expert_chat_message in st.session_state["expert_chat_messages"]:
             with st.chat_message(expert_chat_message["role"]):
                 st.write(expert_chat_message["content"])
+                render_retrieved_sources(expert_chat_message.get("retrieved_sources"))
 
         expert_export_messages = [
             {
@@ -521,16 +652,11 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
             },
             *st.session_state["expert_chat_messages"],
         ]
-        with st.sidebar.expander("Results & details", expanded=False):
-            downloads_tab, trace_tab = st.tabs(["Downloads", "LLM trace"])
-            with downloads_tab:
-                st.caption("Export the saved run or the conversation about it.")
-                render_simulation_exports([expert_last_run], "expert")
-                render_conversation_export(
-                    expert_export_messages, [expert_last_run], "expert"
-                )
-            with trace_tab:
-                render_trace_details()
+        with st.expander("Downloads", expanded=False):
+            render_simulation_exports([expert_last_run], "expert")
+            render_conversation_export(
+                expert_export_messages, [expert_last_run], "expert"
+            )
 
         expert_followup_question = st.chat_input(
             "Ask a question about this result", key="expert_chat_input"
@@ -563,6 +689,11 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                     expert_retrieval_error = str(error)
                     expert_query_plan = {"retrieval_query": expert_followup_question, "query_mode": "fallback"}
 
+                expert_followup_context = (
+                    retrieve_personal_context(expert_query_plan["retrieval_query"])
+                    + expert_followup_context
+                )
+
                 expert_followup_status.update(
                     label=PROCESSING_STATUS_TEXT["answer"]
                 )
@@ -585,6 +716,7 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
                 st.session_state["expert_chat_messages"].append({
                     "role": MESSAGE_ROLE_ASSISTANT,
                     "content": expert_followup_answer,
+                    "retrieved_sources": expert_followup_context,
                 })
 
                 add_llm_trace(
@@ -625,24 +757,34 @@ if st.session_state[SESSION_KEY_APP_MODE] == APP_MODE_EXPERT:
     st.stop()
 
 
-with st.sidebar.expander(TRACE_UI_TEXT["header"], expanded=False):
-    render_trace_details()
-
-
 if SESSION_KEY_USER_PROFILE not in st.session_state:
-    st.subheader(USER_PROFILE_TEXT["header"])
-    with st.form("user_profile_form"):
-        user_type = st.selectbox(USER_PROFILE_TEXT["user_type_label"], options=USER_TYPE_OPTIONS)
-        user_role_details = st.text_input(USER_PROFILE_TEXT["user_role_label"])
-        solar_experience = st.selectbox(USER_PROFILE_TEXT["solar_experience_label"], options=SOLAR_EXPERIENCE_OPTIONS)
-        project_goal = st.selectbox(USER_PROFILE_TEXT["project_goal_label"], options=PROJECT_GOAL_OPTIONS)
-        goal_details = st.text_area(USER_PROFILE_TEXT["goal_details_label"])
-        site_location = st.text_input(
-            USER_PROFILE_TEXT["site_location_label"],
-            placeholder=USER_PROFILE_TEXT["site_location_placeholder"],
-        )
-        datasheet = st.file_uploader(DATASHEET_UPLOAD_TEXT["label"], type=["pdf"], help=DATASHEET_UPLOAD_TEXT["help"])
-        submit_button = st.form_submit_button(USER_PROFILE_TEXT["submit_button"])
+    _, profile_column, _ = st.columns([1, 3, 1])
+    with profile_column:
+        if st.button("Back to modes"):
+            st.session_state[SESSION_KEY_APP_MODE] = None
+            st.rerun()
+        st.title(APP_TITLE)
+        st.subheader(USER_PROFILE_TEXT["header"])
+        st.caption("Your answers help tailor explanations and PV recommendations.")
+        with st.form("user_profile_form", border=True):
+            st.markdown("**Project site**")
+            site_location = st.text_input(
+                USER_PROFILE_TEXT["site_location_label"],
+                value=USER_PROFILE_TEXT["site_location_placeholder"],
+                help="Use the suggested site, replace it with yours, or clear it to ask general questions first.",
+            )
+            st.markdown("**About you**")
+            role_column, experience_column = st.columns(2)
+            with role_column:
+                user_type = st.selectbox(USER_PROFILE_TEXT["user_type_label"], options=USER_TYPE_OPTIONS)
+            with experience_column:
+                solar_experience = st.selectbox(USER_PROFILE_TEXT["solar_experience_label"], options=SOLAR_EXPERIENCE_OPTIONS)
+            project_goal = st.selectbox(USER_PROFILE_TEXT["project_goal_label"], options=PROJECT_GOAL_OPTIONS)
+            with st.expander("Add more context (optional)"):
+                user_role_details = st.text_input(USER_PROFILE_TEXT["user_role_label"])
+                goal_details = st.text_area(USER_PROFILE_TEXT["goal_details_label"])
+                datasheet = st.file_uploader(DATASHEET_UPLOAD_TEXT["label"], type=["pdf"], help=DATASHEET_UPLOAD_TEXT["help"])
+            submit_button = st.form_submit_button(USER_PROFILE_TEXT["submit_button"], type="primary")
 
         if submit_button:
             location_context = {
@@ -683,14 +825,7 @@ if SESSION_KEY_USER_PROFILE not in st.session_state:
     st.stop()
 
 location_context = st.session_state.get(SESSION_KEY_LOCATION_CONTEXT, {})
-lat = location_context.get("latitude")
-lon = location_context.get("longitude")
-address = location_context.get("confirmed_address")
-
-if address:
-    st.success(f"Using location: {address}")
-else:
-    st.info("No site selected yet. I can answer general questions, but I will need a location before running PVMAPS.")
+render_workspace_header(APP_MODE_NON_EXPERT, location_context)
 
 if SESSION_KEY_DATASHEET in st.session_state:
     st.success(DATASHEET_UPLOAD_TEXT["success"])
@@ -711,19 +846,25 @@ for message in st.session_state[SESSION_KEY_CHAT_MESSAGES]:
         pvmaps_runs = st.session_state.get(SESSION_KEY_PVMAPS_RUNS, [])
         if run_index < len(pvmaps_runs):
             run = pvmaps_runs[run_index]
-            render_simulation_result(run)
+            render_simulation_result(run, show_crop=True)
         continue
 
     with st.chat_message(message["role"]):
         st.write(message["content"])
+        render_retrieved_sources(message.get("retrieved_sources"))
 
-render_simulation_comparison(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []))
-render_simulation_exports(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []), "guided")
-render_conversation_export(
-    st.session_state[SESSION_KEY_CHAT_MESSAGES],
-    st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
-    "guided",
-)
+render_simulation_comparison(distinct_solar_runs(
+    st.session_state.get(SESSION_KEY_PVMAPS_RUNS, [])
+))
+render_crop_comparison(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []), "guided")
+if len(st.session_state[SESSION_KEY_CHAT_MESSAGES]) > 1 or st.session_state.get(SESSION_KEY_PVMAPS_RUNS):
+    with st.expander("Downloads", expanded=False):
+        render_simulation_exports(st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []), "guided")
+        render_conversation_export(
+            st.session_state[SESSION_KEY_CHAT_MESSAGES],
+            st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
+            "guided",
+        )
 
 submitted_question = st.chat_input(CHAT_UI_TEXT["answer_label"], key="chat_input")
 if submitted_question:
@@ -755,6 +896,7 @@ if question:
                 location_context=location_context,
                 conversation_history=st.session_state[SESSION_KEY_CHAT_MESSAGES],
                 pvmaps_runs=st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
+                pending_crop_request=st.session_state.get(PENDING_CROP_REQUEST_KEY),
             )
         except Exception as error:
             processing_status.update(
@@ -782,7 +924,7 @@ if question:
                 SESSION_KEY_USER_PROFILE: st.session_state.get(SESSION_KEY_USER_PROFILE),
                 SESSION_KEY_LOCATION_CONTEXT: location_context,
                 "conversation_history": st.session_state[SESSION_KEY_CHAT_MESSAGES],
-                SESSION_KEY_PVMAPS_RUNS: st.session_state.get(SESSION_KEY_PVMAPS_RUNS, []),
+                SESSION_KEY_PVMAPS_RUNS: [compact_run(run) for run in st.session_state.get(SESSION_KEY_PVMAPS_RUNS, [])],
             },
             output=plan,
             decision=plan["turn_type"],
@@ -799,6 +941,7 @@ if question:
                     "longitude": coordinates["longitude"],
                 }
                 st.session_state[SESSION_KEY_LOCATION_CONTEXT] = location_context
+                st.session_state.pop(SESSION_KEY_QUESTIONNAIRE_STATE, None)
                 add_llm_trace(
                     st.session_state,
                     "location_geocoder",
@@ -825,7 +968,9 @@ if question:
                 st.session_state.pop(PENDING_CHAT_QUESTION_KEY, None)
                 st.rerun()
 
-        if plan["turn_type"] == TURN_TYPE_GATHER_INFO and plan.get("question"):
+        if (plan["turn_type"] == TURN_TYPE_GATHER_INFO and plan.get("question")
+                and not st.session_state.get(PENDING_CROP_REQUEST_KEY)
+                and not _requests_crop_estimate(question)):
             update_processing_status(PROCESSING_STATUS_TEXT["answer"])
             st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
                 "role": MESSAGE_ROLE_ASSISTANT,
@@ -844,8 +989,103 @@ if question:
                 },
             )
 
+        elif (
+            (plan["turn_type"] == TURN_TYPE_RUN_PVMAPS and
+             plan.get("analysis") in ("solar_and_crop", "crop_open_sky", "crop_unspecified"))
+            or _requests_crop_estimate(question)
+            or (st.session_state.get(PENDING_CROP_REQUEST_KEY) and
+                "solar only" not in question.casefold() and
+                "just solar" not in question.casefold() and
+                ((plan["turn_type"] == TURN_TYPE_RUN_PVMAPS and
+                  plan.get("analysis") in ("solar_and_crop", "crop_open_sky", "crop_unspecified")) or
+                 plan.get("mentioned_location") or
+                 resolve_crop_analysis(question, {}, {}) != "crop_unspecified" or
+                 resolve_crop_inputs(question, {}).get("crop") or
+                 resolve_crop_inputs(question, {}).get("sowing_date")))
+        ):
+            pending_crop = st.session_state.get(PENDING_CROP_REQUEST_KEY) or {}
+            crop_inputs = resolve_crop_inputs(question, plan, pending_crop)
+            crop_inputs["analysis"] = resolve_crop_analysis(question, plan, pending_crop)
+            crop_request = pending_crop.get("user_request") or question
+            crop_inputs["user_request"] = crop_request
+            st.session_state[PENDING_CROP_REQUEST_KEY] = crop_inputs
+            if location_context.get("latitude") is None or location_context.get("longitude") is None:
+                response = "What is the site location (city and state or country) for this estimate?"
+            elif crop_inputs["analysis"] == "crop_unspecified":
+                response = "Should I estimate crop yield under a PV layout or without panels?"
+            elif not crop_inputs["crop"]:
+                response = "Which crop should I estimate: maize, rice, sorghum, or soybean?"
+            elif not crop_inputs["sowing_date"]:
+                response = "What is the sowing date? Please include the year, for example May 15, 2024."
+            elif date.fromisoformat(crop_inputs["sowing_date"]).year >= date.today().year:
+                crop_inputs["sowing_date"] = None
+                response = "I need a sowing date from a completed weather year. What date and year should I use?"
+            else:
+                response = None
+
+            if response:
+                update_processing_status(PROCESSING_STATUS_TEXT["answer"])
+                st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+                    "role": MESSAGE_ROLE_ASSISTANT, "content": response,
+                })
+                log_conversation_turn(
+                    st.session_state["session_id"], "guided", TURN_TYPE_GATHER_INFO,
+                    question, response,
+                )
+            else:
+                try:
+                    if crop_inputs["analysis"] == "crop_open_sky":
+                        update_processing_status("Running SIMPLE with site weather...")
+                        completed = run_guided_open_sky_estimate(
+                            st.session_state, location_context,
+                            crop_inputs["crop"], crop_inputs["sowing_date"],
+                        )
+                    else:
+                        completed = run_recommended_pvmaps_estimate(
+                            st.session_state, api_key, location_context,
+                            latest_user_message=f"{crop_request} {question}" if crop_request != question else question,
+                            status_callback=update_processing_status,
+                            crop=crop_inputs["crop"], sowing_date=crop_inputs["sowing_date"],
+                        )
+                    processing_failed = not completed
+                    if completed:
+                        st.session_state.pop(PENDING_CROP_REQUEST_KEY, None)
+                    completed_run = (st.session_state[SESSION_KEY_PVMAPS_RUNS][-1]
+                                     if completed else {})
+                    completed_crop = completed_run.get("crop_result") or {}
+                    completed_pv = completed_run.get("output") or {}
+                    log_conversation_turn(
+                        st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
+                        question, completed_run.get("explanation") if completed else "Crop estimate not generated",
+                        extra={"analysis": crop_inputs["analysis"], "crop": crop_inputs["crop"],
+                               "sowing_date": crop_inputs["sowing_date"],
+                               "solar_yield": completed_pv.get("yearly_yield"),
+                               "solar_yield_unit": completed_pv.get("yield_unit"),
+                               "mean_grain_yield_t_ha": completed_crop.get("mean_grain_yield_t_ha")},
+                    )
+                except Exception as error:
+                    processing_failed = True
+                    st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
+                        "role": MESSAGE_ROLE_ASSISTANT,
+                        "content": "I tried to run the crop estimate, but the simulation could not complete. The inputs are saved so we can retry.",
+                    })
+                    add_llm_trace(
+                        st.session_state,
+                        "guided_simple_run" if crop_inputs["analysis"] == "crop_open_sky"
+                        else "combined_simulation",
+                        input_summary={"crop": crop_inputs["crop"], "sowing_date": crop_inputs["sowing_date"]},
+                        output={"error": str(error)}, decision="estimate_failed",
+                    )
+                    log_conversation_turn(
+                        st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
+                        question, "Crop simulation failed",
+                        extra={"analysis": crop_inputs["analysis"], "crop": crop_inputs["crop"],
+                               "sowing_date": crop_inputs["sowing_date"], "error": str(error)},
+                    )
+
         elif plan["turn_type"] == TURN_TYPE_RUN_PVMAPS:
             try:
+                st.session_state.pop(PENDING_CROP_REQUEST_KEY, None)
                 estimate_completed = run_recommended_pvmaps_estimate(
                     st.session_state,
                     api_key,
@@ -856,7 +1096,7 @@ if question:
                 processing_failed = not estimate_completed
                 log_conversation_turn(
                     st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
-                    question, "PVMAPS estimate generated",
+                    question, "PV-MAPS solar estimate generated",
                     extra={
                         "model_name": DEFAULT_MODEL,
                         "user_profile": st.session_state.get(SESSION_KEY_USER_PROFILE),
@@ -881,7 +1121,7 @@ if question:
                 )
                 log_conversation_turn(
                     st.session_state["session_id"], "guided", TURN_TYPE_RUN_PVMAPS,
-                    question, "PVMAPS simulation failed",
+                    question, "PV-MAPS solar simulation failed",
                     extra={
                         "model_name": DEFAULT_MODEL,
                         "user_profile": st.session_state.get(SESSION_KEY_USER_PROFILE),
@@ -943,6 +1183,11 @@ if question:
                 )
                 retrieval_error = str(error)
 
+            retrieved_context = (
+                retrieve_personal_context(rag_plan.get("retrieval_query", question))
+                + retrieved_context
+            )
+
             answer_error = None
             try:
                 update_processing_status(PROCESSING_STATUS_TEXT["answer"])
@@ -977,10 +1222,7 @@ if question:
                     SESSION_KEY_LOCATION_CONTEXT: location_context,
                     "conversation_history": st.session_state[SESSION_KEY_CHAT_MESSAGES],
                     "retrieved_context_count": len(retrieved_context),
-                    "latest_pvmaps_run": {
-                        key: pvmaps_runs[-1].get(key)
-                        for key in ("input", "output", "input_provenance", "location_context")
-                    } if pvmaps_runs else None,
+                    "latest_pvmaps_run": compact_run(pvmaps_runs[-1]) if pvmaps_runs else None,
                 },
                 output={"answer": answer},
                 decision="answered_general_question",
@@ -988,6 +1230,7 @@ if question:
             st.session_state[SESSION_KEY_CHAT_MESSAGES].append({
                 "role": MESSAGE_ROLE_ASSISTANT,
                 "content": answer,
+                "retrieved_sources": retrieved_context,
             })
             log_conversation_turn(
                 st.session_state["session_id"], "guided", "general_question",
@@ -996,8 +1239,14 @@ if question:
                     "model_name": DEFAULT_MODEL,
                     "user_profile": st.session_state.get(SESSION_KEY_USER_PROFILE),
                     "location_context": location_context,
-                    "rag_enabled": rag_plan.get("source", "none") != "none",
-                    "rag_source": rag_plan.get("source", "none"),
+                    "rag_enabled": bool(retrieved_context),
+                    "rag_source": (
+                        ("personal" if rag_plan.get("source", "none") == "none"
+                         else f"{rag_plan['source']}+personal")
+                        if any((chunk.get("metadata") or {}).get("library") == "My library"
+                               for chunk in retrieved_context)
+                        else rag_plan.get("source", "none")
+                    ),
                     "rag_router_reason": rag_plan.get("reason"),
                     "retrieval_query": (
                         rag_plan.get("retrieval_query", question)

@@ -282,6 +282,7 @@ def summarize_retrieved_chunks(retrieved_chunks):
         {
             "text": chunk["text"],
             "title": display_source_title(chunk.get("metadata", {}).get("title")),
+            "library": chunk.get("metadata", {}).get("library") or "CEED library",
             "page": chunk.get("metadata", {}).get("page"),
             "distance": chunk.get("distance"),
         }
