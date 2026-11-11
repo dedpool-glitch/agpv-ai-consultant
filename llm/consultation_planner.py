@@ -4,6 +4,7 @@ from constants import TURN_TYPE_GENERAL_CHAT, TURN_TYPES
 from llm.prompts import LLM_SYSTEM_TURN_ROUTER_PROMPT
 from llm.client import call_llm
 from llm.json_utils import parse_json_response
+from services.run_context import compact_run
 
 
 _DIRECT_QUESTION_STARTS = (
@@ -35,6 +36,7 @@ def route_conversation_turn(
     location_context=None,
     conversation_history=None,
     pvmaps_runs=None,
+    pending_crop_request=None,
 ):
     """
     Classify the next conversation turn as general_chat, gather_info, or
@@ -55,7 +57,8 @@ def route_conversation_turn(
                 f"User profile:\n{json.dumps(user_profile, indent=2)}\n\n"
                 f"Location context:\n{json.dumps(location_context, indent=2)}\n\n"
                 f"Conversation history:\n{json.dumps(conversation_history, indent=2)}\n\n"
-                f"Prior PVMAPS runs this session:\n{json.dumps(pvmaps_runs, indent=2)}\n\n"
+                f"Prior PVMAPS runs this session:\n{json.dumps([compact_run(run) for run in (pvmaps_runs or [])], indent=2)}\n\n"
+                f"Pending crop estimate (if any):\n{json.dumps(pending_crop_request, indent=2)}\n\n"
                 f"Latest user message to classify:\n{latest_user_message}\n\n"
                 "Classify the latest user message."
             ),
@@ -72,6 +75,9 @@ def route_conversation_turn(
             "known_facts": [],
             "reason": "Fallback to general chat because the router returned invalid JSON.",
             "mentioned_location": None,
+            "analysis": "solar",
+            "crop": None,
+            "sowing_date": None,
         }
 
     turn_type = plan.get("turn_type")
@@ -90,4 +96,7 @@ def route_conversation_turn(
         "known_facts": plan.get("known_facts", []),
         "reason": plan.get("reason"),
         "mentioned_location": plan.get("mentioned_location") or None,
+        "analysis": plan.get("analysis") if plan.get("analysis") in ("solar", "solar_and_crop", "crop_open_sky", "crop_unspecified") else "solar",
+        "crop": plan.get("crop"),
+        "sowing_date": plan.get("sowing_date"),
     }

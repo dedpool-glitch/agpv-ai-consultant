@@ -1,4 +1,5 @@
 import copy
+from datetime import date
 import importlib
 import sys
 import types
@@ -150,6 +151,34 @@ class ProvenanceFlowTests(unittest.TestCase):
             PROCESSING_STATUS_TEXT["simulation"],
             PROCESSING_STATUS_TEXT["explanation"],
         ])
+
+    def test_guided_crop_run_uses_recommended_pv_input_and_saves_crop(self):
+        state = {"chat_messages": [{"role": "user", "content": "Estimate maize"}]}
+        candidate = {"pvmaps_inputs": dict(QUESTIONNAIRE_DEFAULTS)}
+        crop = {
+            "crop": "maize", "sowing_date": "2024-05-15",
+            "maturity_date": "2024-10-05", "mean_grain_yield_t_ha": 12.4,
+            "grain_yield_t_ha_by_position": [12.4] * 101,
+            "assumptions": [],
+        }
+        with patch.object(self.service, "retrieve_recommendation_context", return_value=[]), \
+             patch.object(self.service, "generate_recommended_pvmaps_config", return_value=candidate), \
+             patch.object(self.service, "run_combined_estimate", return_value={
+                 "pv": {"yearly_yield": 650.0, "yield_unit": "kwh/m"}, "crop": crop,
+             }) as combined, \
+             patch.object(self.service, "run_pvmaps") as solar_only, \
+             patch.object(self.service, "explain_output") as llm_explainer:
+            self.assertTrue(self.service.run_recommended_pvmaps_estimate(
+                state, "unused", {"latitude": 40, "longitude": -86},
+                crop="maize", sowing_date="2024-05-15",
+                latest_user_message="Estimate maize",
+            ))
+        self.assertEqual(combined.call_args.args[1:], ("maize", date(2024, 5, 15)))
+        self.assertEqual(combined.call_args.args[0]["lat"], 40)
+        self.assertEqual(state["pvmaps_runs"][0]["crop_result"], crop)
+        self.assertIn("SIMPLE estimates 12.40 t/ha", state["pvmaps_runs"][0]["explanation"])
+        solar_only.assert_not_called()
+        llm_explainer.assert_not_called()
 
     def test_explainer_receives_metadata_and_allows_older_callers(self):
         origins = {"parameters": {"pitch": {"source": "user_provided", "value": 12}}}

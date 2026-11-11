@@ -68,6 +68,23 @@ def test_simulation_request_is_not_downgraded(monkeypatch):
     assert plan["turn_type"] == TURN_TYPE_RUN_PVMAPS
 
 
+def test_router_preserves_combined_analysis_fields(monkeypatch):
+    monkeypatch.setattr(
+        "llm.consultation_planner.call_llm",
+        lambda *_args, **_kwargs: json.dumps({
+            "turn_type": "run_pvmaps", "analysis": "solar_and_crop",
+            "crop": "maize", "sowing_date": "2024-05-15",
+        }),
+    )
+    plan = route_conversation_turn(
+        "key", latest_user_message="Estimate maize yield, sown May 15, 2024"
+    )
+    assert plan["turn_type"] == TURN_TYPE_RUN_PVMAPS
+    assert (plan["analysis"], plan["crop"], plan["sowing_date"]) == (
+        "solar_and_crop", "maize", "2024-05-15",
+    )
+
+
 def test_rag_source_router_can_choose_both_without_keyword_override(monkeypatch):
     calls = []
 

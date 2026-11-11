@@ -1,4 +1,5 @@
 import copy
+from datetime import date
 
 from constants import (
     MESSAGE_ROLE_ASSISTANT,
@@ -16,6 +17,8 @@ from llm.output_generator import explain_output
 from llm.recommended_pvmaps_config import generate_recommended_pvmaps_config
 from models.pvmaps.input_validator import validate_pvmaps_input
 from models.pvmaps.matlab_runner import run_pvmaps
+from models.simple.crops import CROP_FILES
+from services.combined_estimate_service import run_combined_estimate
 from questionnaire.state import initialize_questionnaire_state, update_questionnaire_state
 from questionnaire.to_pvmaps import build_pvmaps_input_from_questionnaire
 from rag.pipeline import retrieve_for_source, summarize_retrieved_chunks
@@ -25,6 +28,8 @@ from services.parameter_provenance import (
     build_report_provenance,
     describe_assumptions,
 )
+from services.run_context import compact_run
+from services.simulation_log import log_simulation_run
 
 
 def retrieve_recommendation_context(session_state, latest_user_message):
@@ -52,6 +57,8 @@ def run_recommended_pvmaps_estimate(
     latest_user_message=None,
     run_label=None,
     status_callback=None,
+    crop=None,
+    sowing_date=None,
 ):
     """
     Run one PVMAPS solar-yield estimate and append it to session_state[SESSION_KEY_PVMAPS_RUNS].
@@ -63,6 +70,16 @@ def run_recommended_pvmaps_estimate(
     upstream. A one-off change only affects this run; it does not overwrite
     the session's baseline questionnaire state.
     """
+    if (crop is None) != (sowing_date is None):
+        raise ValueError("Crop and sowing date must be supplied together.")
+    if crop is not None:
+        if crop not in CROP_FILES:
+            raise ValueError(f"Unsupported crop: {crop!r}")
+        if isinstance(sowing_date, str):
+            sowing_date = date.fromisoformat(sowing_date)
+        if not isinstance(sowing_date, date):
+            raise ValueError("Sowing date must be a calendar date.")
+
     lat = location_context.get("latitude")
     lon = location_context.get("longitude")
 
@@ -72,7 +89,7 @@ def run_recommended_pvmaps_estimate(
     if lat is None or lon is None:
         session_state[SESSION_KEY_CHAT_MESSAGES].append({
             "role": MESSAGE_ROLE_ASSISTANT,
-            "content": "I can discuss agrivoltaics generally, but I need a site location before I can run a solar-yield estimate.",
+            "content": "I need a site location before I can run this estimate.",
         })
         return False
 
@@ -132,7 +149,7 @@ def run_recommended_pvmaps_estimate(
     if recommendation_errors:
         session_state[SESSION_KEY_CHAT_MESSAGES].append({
             "role": MESSAGE_ROLE_ASSISTANT,
-            "content": "I tried to prepare a solar-yield estimate, but the recommended setup did not pass validation yet. I can still discuss the assumptions or ask a few setup questions.",
+            "content": "I tried to prepare the PV setup for this estimate, but it did not pass validation. We can review the assumptions and try again.",
         })
         return False
 
@@ -164,7 +181,7 @@ def run_recommended_pvmaps_estimate(
     if errors:
         session_state[SESSION_KEY_CHAT_MESSAGES].append({
             "role": MESSAGE_ROLE_ASSISTANT,
-            "content": "I prepared a solar-yield setup, but it failed input validation. The setup needs to be reviewed before running PVMAPS.",
+            "content": "The PV inputs for this estimate failed validation. Review the setup before running the models.",
         })
         add_llm_trace(
             session_state,
@@ -189,28 +206,46 @@ def run_recommended_pvmaps_estimate(
     report_history = copy.deepcopy(session_state[SESSION_KEY_CHAT_MESSAGES])
 
     if status_callback:
-        status_callback(PROCESSING_STATUS_TEXT["simulation"])
-    output = run_pvmaps(
-        pvmaps_input,
-        PVMAPS_SCRIPT_PATH
-    )
+        status_callback("Running PV-MAPS and SIMPLE..." if crop is not None
+                        else PROCESSING_STATUS_TEXT["simulation"])
+    crop_result = None
+    if crop is not None:
+        combined = run_combined_estimate(pvmaps_input, crop, sowing_date)
+        output = combined["pv"]
+        crop_result = combined["crop"]
+    else:
+        output = run_pvmaps(pvmaps_input, PVMAPS_SCRIPT_PATH)
     if status_callback:
         status_callback(PROCESSING_STATUS_TEXT["explanation"])
-    explanation = explain_output(
-        output,
-        api_key,
-        user_profile=session_state.get(SESSION_KEY_USER_PROFILE),
-        pvmaps_input=pvmaps_input,
-        input_provenance=input_provenance,
-        user_request=latest_user_message,
-        conversation_history=report_history,
-    )
+    if crop_result is not None:
+        explanation = (
+            f"PV-MAPS estimates {output['yearly_yield']:.2f} "
+            f"{output.get('yield_unit') or 'units'} annual solar yield. "
+            f"SIMPLE estimates {crop_result['mean_grain_yield_t_ha']:.2f} t/ha "
+            f"mean {crop} grain yield with PV, with maturity on "
+            f"{crop_result['maturity_date']}. These are modeled estimates, "
+            "not measured production. The result card shows the recommended "
+            "PV inputs and crop assumptions."
+        )
+    else:
+        explanation = explain_output(
+            output,
+            api_key,
+            user_profile=session_state.get(SESSION_KEY_USER_PROFILE),
+            pvmaps_input=pvmaps_input,
+            input_provenance=input_provenance,
+            user_request=latest_user_message,
+            conversation_history=report_history,
+        )
 
     run_record = {
+        "analysis": "solar_and_crop" if crop_result is not None else "solar",
         "location_context": copy.deepcopy(location_context),
-        "label": run_label or ("Variant estimate" if changed_fields else "Solar-yield estimate"),
+        "label": run_label or ("Solar + crop estimate" if crop_result is not None else
+                               "Variant estimate" if changed_fields else "Solar-yield estimate"),
         "input": pvmaps_input,
         "output": output,
+        "crop_result": crop_result,
         "explanation": explanation,
         "overrides": changed_fields,
         "input_provenance": copy.deepcopy(input_provenance),
@@ -229,7 +264,7 @@ def run_recommended_pvmaps_estimate(
     })
     add_llm_trace(
         session_state,
-        "pvmaps_background_tool",
+        "combined_simulation" if crop_result is not None else "pvmaps_background_tool",
         input_summary={
             "pvmaps_input": pvmaps_input,
             "recommendation_justifications": justifications,
@@ -239,9 +274,10 @@ def run_recommended_pvmaps_estimate(
             "report_conversation_history": report_history,
         },
         output={
-            "pvmaps_output": output,
+            "run_summary": compact_run(run_record),
             "explanation": explanation,
         },
         decision="estimate_completed_and_stored",
     )
+    log_simulation_run(session_state.get("session_id"), "guided", run_record)
     return True

@@ -4,6 +4,7 @@ from llm.prompts import LLM_SYSTEM_GENERAL_AGPV_PROMPT
 from llm.client import DEFAULT_MODEL, call_llm
 from llm.rag_formatting import format_retrieved_context
 from llm.output_generator import format_input_field_descriptions
+from services.run_context import compact_run
 
 
 def answer_general_agpv_question(
@@ -22,12 +23,8 @@ def answer_general_agpv_question(
     run_section = ""
     if latest_pvmaps_run:
         # Keep inputs, results, and origins tied to the same saved run.
-        latest_pvmaps_output = latest_pvmaps_run.get("output")
-        run_context = {
-            key: latest_pvmaps_run.get(key)
-            for key in ("label", "input", "input_provenance", "assumptions",
-                        "overrides", "user_request", "location_context")
-        }
+        run_context = compact_run(latest_pvmaps_run)
+        latest_pvmaps_output = run_context["output"]
         definitions = format_input_field_descriptions(latest_pvmaps_run.get("input"))
         run_section = (
             f"Latest completed run (actual inputs and recorded origins):\n"
@@ -37,6 +34,10 @@ def answer_general_agpv_question(
             "site conditions, or optimality. If an origin or reason is absent, say it was "
             "not recorded; do not reconstruct it from typical values or earlier assistant claims.\n\n"
         )
+    elif latest_pvmaps_output:
+        latest_pvmaps_output = {key: latest_pvmaps_output.get(key) for key in (
+            "yearly_yield", "yield_unit", "monthly_yield", "warnings",
+        ) if latest_pvmaps_output.get(key) is not None}
     context_text = format_retrieved_context(retrieved_context)
     context_section = (
         f"Retrieved source excerpts (ground specific facts/figures in these where relevant; "

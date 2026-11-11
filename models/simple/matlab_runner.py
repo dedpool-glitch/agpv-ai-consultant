@@ -6,14 +6,7 @@ import math
 
 import matlab
 import matlab.engine
-
-
-CROP_FILES = {
-    "maize": "maize_calib.mat",
-    "rice": "rice_spec.mat",
-    "sorghum": "sorghum_spec.mat",
-    "soybean": "soybean_spec.mat",
-}
+from models.simple.crops import CROP_FILES
 
 
 def run_simple(weather_rows, ground_light, crop, sowing_date, open_sky_light=None):
