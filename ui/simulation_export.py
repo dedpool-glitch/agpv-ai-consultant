@@ -9,9 +9,9 @@ def render_simulation_exports(runs, key_prefix):
     import streamlit as st
 
     st.download_button(
-        "Download results",
+        "Results",
         data=build_simulation_workbook(runs),
-        file_name="pvmaps_results.xlsx",
+        file_name="agpv_results.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         icon=":material/download:",
         key=f"{key_prefix}_results_workbook",

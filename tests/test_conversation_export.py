@@ -19,7 +19,7 @@ def test_markdown_export_contains_visible_chat_and_simulation_marker():
     assert "Exported: 2026-10-18 23:15" in exported
     assert "## You\n\nHow does spacing affect yield?" in exported
     assert "## AgPV Assistant\n\nWider spacing can reduce shading." in exported
-    assert "## PVMAPS result: Solar-yield estimate" in exported
+    assert "## Simulation result: Solar-yield estimate" in exported
     assert "The estimated annual yield is 1200 kWh." in exported
 
 

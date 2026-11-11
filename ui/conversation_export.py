@@ -9,7 +9,7 @@ def render_conversation_export(messages, pvmaps_runs, key_prefix):
     import streamlit as st
 
     st.download_button(
-        "Download conversation",
+        "Conversation",
         data=build_conversation_markdown(messages, pvmaps_runs),
         file_name="agpv_conversation.md",
         mime="text/markdown",

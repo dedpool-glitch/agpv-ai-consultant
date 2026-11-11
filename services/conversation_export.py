@@ -30,7 +30,7 @@ def build_conversation_markdown(messages, pvmaps_runs=None, exported_at=None):
             if isinstance(run_index, int) and 0 <= run_index < len(runs):
                 run = runs[run_index]
                 label = run.get("label") or f"Simulation {run_index + 1}"
-                lines.extend([f"## PVMAPS result: {label}", ""])
+                lines.extend([f"## Simulation result: {label}", ""])
             continue
 
         content = message.get("content")
