@@ -1,6 +1,7 @@
 """Compare saved runs without another simulation or LLM request."""
 
 import math
+import json
 from numbers import Real
 
 from constants import MONTH_LABELS
@@ -19,14 +20,38 @@ def _input(run, path):
     return value
 
 
+def distinct_solar_runs(runs):
+    """Keep one copy of each solar setup/result for the solar comparison."""
+    distinct = []
+    seen = set()
+    for run in runs:
+        output = run.get("output") or {}
+        if output.get("yearly_yield") is None:
+            continue
+        signature = json.dumps({
+            "input": run.get("input") or {},
+            "yearly_yield": output.get("yearly_yield"),
+            "yield_unit": output.get("yield_unit"),
+            "monthly_yield": output.get("monthly_yield"),
+        }, sort_keys=True, default=str)
+        if signature in seen:
+            continue
+        seen.add(signature)
+        distinct.append(run)
+    return distinct
+
+
 def run_name(run, index):
-    return f"Run {index + 1} | {_input(run, 'array.config') or 'Configuration unknown'} | {format_value(_input(run, 'array.pitch'))} m pitch"
+    label = run.get("label") or "Solar estimate"
+    return f"Run {index + 1} | {label} | {_input(run, 'array.config') or 'Configuration unknown'} | {format_value(_input(run, 'array.pitch'))} m pitch"
 
 
 def yield_difference(run, reference):
     output, baseline = run.get("output") or {}, reference.get("output") or {}
     value, base = output.get("yearly_yield"), baseline.get("yearly_yield")
-    if not output.get("yield_unit") or output.get("yield_unit") != baseline.get("yield_unit"):
+    current_unit = str(output.get("yield_unit") or "").casefold()
+    baseline_unit = str(baseline.get("yield_unit") or "").casefold()
+    if not current_unit or current_unit != baseline_unit:
         return None, None
     if not _number(value) or not _number(base):
         return None, None
@@ -112,10 +137,11 @@ def render_simulation_comparison(runs):
         st.dataframe(deltas, hide_index=True, use_container_width=True)
         st.caption("Differences use unrounded saved results. Percentage differences are unavailable for a zero reference yield; incompatible or missing units cannot be compared.")
 
-        units = {(runs[index].get("output") or {}).get("yield_unit") for index in selected}
-        if len(units) == 1 and None not in units and "" not in units:
-            unit = next(iter(units))
-            fig, ax = plt.subplots(figsize=(9, 4), layout="constrained")
+        units = {str((runs[index].get("output") or {}).get("yield_unit") or "").casefold()
+                 for index in selected}
+        if len(units) == 1 and "" not in units:
+            unit = "kWh/m" if next(iter(units)) == "kwh/m" else next(iter(units))
+            fig, ax = plt.subplots(figsize=(7.6, 3.0), layout="constrained")
             plotted = 0
             colors = ["#268477", "#c45538", "#7358a6", "#2676b6"]
             for position, index in enumerate(selected):
@@ -135,7 +161,7 @@ def render_simulation_comparison(runs):
                 plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
                 st.markdown("#### Monthly yield comparison")
                 try:
-                    st.pyplot(fig, use_container_width=True)
+                    st.pyplot(fig, width="content")
                 finally:
                     plt.close(fig)
             else:

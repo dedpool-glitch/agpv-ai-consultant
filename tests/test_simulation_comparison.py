@@ -1,7 +1,9 @@
 import copy
 import unittest
 
-from ui.simulation_comparison import changed_inputs, comparison_cautions, run_name, yield_difference
+from ui.simulation_comparison import (
+    changed_inputs, comparison_cautions, distinct_solar_runs, run_name, yield_difference,
+)
 
 
 def run(yield_value=100, pitch=8, unit="kWh/m"):
@@ -42,6 +44,17 @@ class ComparisonTests(unittest.TestCase):
         runs = [run(), {"output": {}}]
         self.assertTrue(comparison_cautions(runs, [0, 1]))
         self.assertTrue(any(row["Run 2"] == "Not available" for row in changed_inputs(runs, [0, 1])))
+
+    def test_duplicate_solar_runs_do_not_create_a_comparison(self):
+        solar = run(978.78, pitch=5)
+        solar["label"] = "Solar-yield estimate"
+        combined = copy.deepcopy(solar)
+        combined["label"] = "Solar + crop estimate"
+        combined["crop_result"] = {"mean_grain_yield_t_ha": 3.03}
+        crop_only = {"analysis": "crop_open_sky", "output": {}, "crop_result": {}}
+        assert distinct_solar_runs([solar, crop_only, combined]) == [solar]
+        changed = run(1000, pitch=10)
+        assert distinct_solar_runs([solar, combined, changed]) == [solar, changed]
 
 
 if __name__ == "__main__":
